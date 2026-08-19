@@ -1,0 +1,282 @@
+/* ============================================================
+   SERVED — design tokens & foundations
+   White/fog environment, frosted glass, instrument linework.
+   ============================================================ */
+
+:root {
+  /* ---- environment ---- */
+  --fog: #ececed;
+  --fog-deep: #e3e3e5;
+  --paper: #ffffff;
+
+  /* ---- ink ---- */
+  --ink: #0e0f11;
+  --ink-70: rgba(14, 15, 17, 0.7);
+  --ink-45: rgba(14, 15, 17, 0.45);
+  --ink-30: rgba(14, 15, 17, 0.3);
+  --ink-14: rgba(14, 15, 17, 0.14);
+  --ink-08: rgba(14, 15, 17, 0.08);
+  --ink-04: rgba(14, 15, 17, 0.045);
+
+  /* ---- light on glass ---- */
+  --lume: rgba(255, 255, 255, 0.92);
+  --lume-70: rgba(255, 255, 255, 0.7);
+  --lume-45: rgba(255, 255, 255, 0.45);
+  --lume-22: rgba(255, 255, 255, 0.22);
+
+  /* ---- palette families (used only as gradient light) ---- */
+  --lime: #d9f265;
+  --lime-deep: #a8d63f;
+  --green: #4da566;
+  --green-deep: #2b7a49;
+  --mint: #bfe7c8;
+  --peach: #ffd0aa;
+  --amber: #f5a951;
+  --coral: #ff8360;
+  --pink: #ffa3c6;
+  --rose: #f277a4;
+  --cyan: #a5d8e6;
+  --blue: #bccdee;
+  --blue-deep: #8ba4d8;
+  --lavender: #c9bcee;
+
+  /* ---- radii ---- */
+  --r-xl: 34px;
+  --r-lg: 26px;
+  --r-md: 20px;
+  --r-sm: 14px;
+  --r-xs: 10px;
+  --r-pill: 999px;
+
+  /* ---- spacing ---- */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 44px;
+  --s9: 64px;
+
+  /* ---- elevation ---- */
+  --lift-1: 0 1px 1px rgba(14, 15, 17, 0.03), 0 2px 6px -2px rgba(14, 15, 17, 0.06);
+  --lift-2: 0 1px 1px rgba(14, 15, 17, 0.03), 0 12px 28px -14px rgba(14, 15, 17, 0.16);
+  --lift-3: 0 2px 2px rgba(14, 15, 17, 0.04), 0 26px 50px -20px rgba(14, 15, 17, 0.26);
+
+  /* ---- layout ---- */
+  --shell-pad: 18px;
+  --tabbar-h: 62px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  background: var(--fog);
+  color: var(--ink);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 300;
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* the fog is not flat — a very faint spatial wash, like a lit studio backdrop */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60% 40% at 20% 0%, rgba(255, 255, 255, 0.9), transparent 70%),
+    radial-gradient(50% 35% at 100% 22%, rgba(255, 255, 255, 0.55), transparent 70%),
+    radial-gradient(70% 50% at 50% 110%, rgba(14, 15, 17, 0.05), transparent 70%);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(168, 214, 63, 0.35);
+}
+
+/* ============================================================
+   TYPE
+   ============================================================ */
+
+.t-display {
+  font-size: 30px;
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+}
+
+.t-title {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+}
+
+.t-sub {
+  font-size: 17px;
+  font-weight: 300;
+  letter-spacing: -0.022em;
+  line-height: 1.25;
+}
+
+.t-body {
+  font-size: 14.5px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
+}
+
+.t-micro {
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: -0.005em;
+}
+
+.t-label {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.t-dim {
+  color: var(--ink-45);
+}
+
+.t-dim-2 {
+  color: var(--ink-30);
+}
+
+/* ============================================================
+   SURFACES
+   ============================================================ */
+
+.surface {
+  position: relative;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  box-shadow: var(--lift-1);
+  isolation: isolate;
+}
+
+/* fine outline drawn as an inset ring so it never clips gradients */
+.hairline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--ink-08), inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+}
+
+.hairline-lume::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.32),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.55);
+}
+
+.glass {
+  position: relative;
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: var(--lift-1);
+  isolation: isolate;
+}
+
+/* film grain — keeps gradients from looking like generic CSS blobs */
+.grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* ============================================================
+   SCROLL / SHELL
+   ============================================================ */
+
+.screen {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  padding: 0 var(--shell-pad);
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-b) + 28px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.hstrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  margin: 0 calc(-1 * var(--shell-pad));
+  padding: 2px var(--shell-pad);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
