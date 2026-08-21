@@ -10,6 +10,7 @@ import { ScorePanel } from '@/components/recipe/ScorePanel';
 import { ServingStepper } from '@/components/recipe/ServingStepper';
 import { IngredientLines } from '@/components/recipe/IngredientLines';
 import { CopyPromptButton } from '@/components/recipe/CopyPromptButton';
+import { PhotoControl } from '@/components/recipe/PhotoControl';
 import { ease } from '@/lib/motion';
 
 export default function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -84,20 +85,26 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
             </svg>
           </FloatControl>
 
-          <FloatControl
-            label={recipe.favorite ? 'Remove from favourites' : 'Add to favourites'}
-            onClick={() => void saveRecipe({ ...recipe, favorite: !recipe.favorite })}
-          >
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
-              <path
-                d="M7.5 12.4 3.3 8.3a2.7 2.7 0 0 1 3.8-3.8l.4.4.4-.4a2.7 2.7 0 1 1 3.8 3.8z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinejoin="round"
-                fill={recipe.favorite ? 'currentColor' : 'none'}
-              />
-            </svg>
-          </FloatControl>
+          <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
+            <PhotoControl
+              recipe={recipe}
+              onSave={async (image_url) => void (await saveRecipe({ ...recipe, image_url }))}
+            />
+            <FloatControl
+              label={recipe.favorite ? 'Remove from favourites' : 'Add to favourites'}
+              onClick={() => void saveRecipe({ ...recipe, favorite: !recipe.favorite })}
+            >
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
+                <path
+                  d="M7.5 12.4 3.3 8.3a2.7 2.7 0 0 1 3.8-3.8l.4.4.4-.4a2.7 2.7 0 1 1 3.8 3.8z"
+                  stroke="currentColor"
+                  strokeWidth="1.2"
+                  strokeLinejoin="round"
+                  fill={recipe.favorite ? 'currentColor' : 'none'}
+                />
+              </svg>
+            </FloatControl>
+          </div>
         </div>
       </div>
 

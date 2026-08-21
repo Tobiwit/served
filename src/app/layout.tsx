@@ -19,6 +19,9 @@ export const metadata: Metadata = {
   applicationName: 'Served',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'Served' },
   formatDetection: { telephone: false },
+  // Next emits the modern `mobile-web-app-capable`; iOS still wants the legacy
+  // name to launch chromeless from the Home Screen on older versions
+  other: { 'apple-mobile-web-app-capable': 'yes' },
 };
 
 export const viewport: Viewport = {

@@ -1,4 +1,4 @@
-import type { Ingredient, Recipe } from '@/lib/db/types';
+import type { Ingredient, Recipe, RecipeIngredient } from '@/lib/db/types';
 import type { RecipeAnalysis } from '@/lib/scoring';
 import type { FilterState } from './filters';
 
@@ -35,7 +35,7 @@ export function passesFilters(recipe: Recipe, analysis: RecipeAnalysis, f: Filte
     const t = recipe.total_minutes;
     if (t == null || t > f.time.value) return false;
   }
-  if (f.cuisines.length && !(recipe.cuisine && f.cuisines.includes(recipe.cuisine))) return false;
+  if (f.cuisineOn && f.cuisines.length && !(recipe.cuisine && f.cuisines.includes(recipe.cuisine))) return false;
   if (f.courses.length && !(recipe.course_type && f.courses.includes(recipe.course_type))) return false;
   return true;
 }
@@ -86,13 +86,34 @@ export function evaluate(
     const id = ri.ingredient_id;
     if (!id) continue;
     if (boosted.has(id)) boostHits++;
-    if (!excluded.has(id)) continue;
+
     if (ri.role === 'basic') continue;
-    if (ri.role === 'core') return null;
-    if (ri.role === 'substitutable') swaps.push(ri.display_name);
+
+    if (ri.role === 'core') {
+      if (excluded.has(id)) return null;
+      continue;
+    }
+
+    if (ri.role === 'substitutable') {
+      // the slot needs *one* of its options; it only fails once they are all gone
+      const group = optionIds(ri);
+      const alive = group.filter((g) => !excluded.has(g));
+      if (alive.length === 0) return null;
+      if (excluded.has(id)) swaps.push(ri.display_name);
+      continue;
+    }
+
+    // optional: excluding it costs the recipe nothing
   }
 
   return { recipe, analysis, swaps, boostHits };
+}
+
+/** Every ingredient that could fill a slot: the named one, then its alternatives. */
+export function optionIds(ri: RecipeIngredient): string[] {
+  const ids = ri.ingredient_id ? [ri.ingredient_id] : [];
+  for (const s of ri.substitutions) if (s.substitute_ingredient_id) ids.push(s.substitute_ingredient_id);
+  return ids;
 }
 
 /**

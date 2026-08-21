@@ -18,9 +18,10 @@ type Props = {
   /** 'lume' = white marks on a colour field, 'ink' = dark marks on white */
   ink?: 'lume' | 'ink';
   label?: string;
+  /** overall height; the marks, indicator and captions scale with it */
+  height?: number;
 };
 
-const H = 52;
 const PAD = 10;
 
 /**
@@ -39,6 +40,7 @@ export function DottedScale({
   unit,
   ink = 'lume',
   label,
+  height: H = 52,
 }: Props) {
   const { ref, width } = useMeasureWidth<HTMLDivElement>();
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -84,6 +86,11 @@ export function DottedScale({
   const cText = lume ? 'rgba(255,255,255,0.62)' : 'rgba(14,15,17,0.38)';
 
   const isLit = (v: number) => (direction === 'atLeast' ? v >= value : v <= value);
+
+  const mid = H * 0.36;
+  const tickSpan = H * 0.19;
+  const indSpan = H * 0.33;
+  const labelY = H * 0.88;
 
   return (
     <div
@@ -133,7 +140,7 @@ export function DottedScale({
                 <circle
                   key={v}
                   cx={toX(v)}
-                  cy={19}
+                  cy={mid}
                   r={lit ? 1.5 : 1.15}
                   fill={lit ? cLit : cDim}
                   style={{ transition: 'fill 220ms linear, r 220ms linear' }}
@@ -145,18 +152,18 @@ export function DottedScale({
                 <line
                   x1={toX(v)}
                   x2={toX(v)}
-                  y1={9}
-                  y2={29}
+                  y1={mid - tickSpan}
+                  y2={mid + tickSpan}
                   stroke={isLit(v) ? cLit : cDim}
                   strokeWidth={1}
                   style={{ transition: 'stroke 220ms linear' }}
                 />
                 <text
                   x={toX(v)}
-                  y={45}
+                  y={labelY}
                   textAnchor="middle"
                   fill={cText}
-                  fontSize={9}
+                  fontSize={H < 46 ? 8 : 9}
                   letterSpacing="0.08em"
                   style={{ fontWeight: 400 }}
                 >
@@ -165,8 +172,16 @@ export function DottedScale({
               </g>
             ))}
             <motion.g animate={{ x: toX(value) }} transition={spring.dial} initial={false}>
-              <line x1={0} x2={0} y1={2} y2={36} stroke={cKey} strokeWidth={1.6} strokeLinecap="round" />
-              <circle cx={0} cy={-2.5} r={2} fill={cKey} />
+              <line
+                x1={0}
+                x2={0}
+                y1={mid - indSpan}
+                y2={mid + indSpan}
+                stroke={cKey}
+                strokeWidth={1.6}
+                strokeLinecap="round"
+              />
+              <circle cx={0} cy={Math.max(2, mid - indSpan - 4.5)} r={2} fill={cKey} />
             </motion.g>
           </g>
         </svg>

@@ -178,3 +178,27 @@ begin
     );
   end loop;
 end $$;
+
+-- ------------------------------------------------------------------- storage
+-- Recipe photos. The app compresses to ~1100px JPEG before upload; without
+-- Supabase configured the same image is kept as a data URL on the device.
+
+insert into storage.buckets (id, name, public)
+values ('recipe-images', 'recipe-images', true)
+on conflict (id) do nothing;
+
+create policy "recipe images are readable"
+  on storage.objects for select
+  using (bucket_id = 'recipe-images');
+
+create policy "recipe images are writable by authenticated users"
+  on storage.objects for insert to authenticated
+  with check (bucket_id = 'recipe-images');
+
+create policy "recipe images are updatable by authenticated users"
+  on storage.objects for update to authenticated
+  using (bucket_id = 'recipe-images');
+
+create policy "recipe images are removable by authenticated users"
+  on storage.objects for delete to authenticated
+  using (bucket_id = 'recipe-images');

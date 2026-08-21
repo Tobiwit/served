@@ -50,6 +50,20 @@ const GLYPHS: Record<string, Stroke[]> = {
     { k: 'dot', x: 5, y: 12 },
   ],
   '?': [A(5, 5, 3.2, 3.4, 180, 380), L(7.6, 6.4, 5, 10.4), { k: 'dot', x: 5, y: 14.4 }],
+
+  // Uppercase letters, added for the wordmark. Only the ones SERVED needs are
+  // drawn — extend this the same way if another word ever has to be set.
+  S: [A(5, 4.8, 3.5, 3.6, 330, 110), L(3.8, 8.18, 6.27, 7.73), A(5, 11.3, 3.7, 3.8, 290, 520)],
+  E: [L(8.6, 1.2, 1.7, 1.2), L(1.7, 1.2, 1.7, 14.8), L(1.7, 14.8, 8.6, 14.8), L(1.7, 8, 7.2, 8)],
+  R: [
+    L(1.8, 1, 1.8, 15),
+    L(1.8, 1, 4.6, 1),
+    A(4.6, 4.5, 3.4, 3.5, 270, 450),
+    L(1.8, 8, 4.6, 8),
+    L(4.9, 8.2, 8.8, 15),
+  ],
+  V: [L(1.4, 1, 5, 15), L(5, 15, 8.6, 1)],
+  D: [L(1.8, 1, 1.8, 15), L(1.8, 1, 4.2, 1), A(4.2, 8, 4.6, 7, 270, 450), L(1.8, 15, 4.2, 15)],
 };
 
 export type Dot = { x: number; y: number };
@@ -103,7 +117,7 @@ function sampleArc(s: Extract<Stroke, { k: 'arc' }>, spacing: number): Dot[] {
 }
 
 /** Dots for a single character, in the 10x16 glyph box. */
-export function glyphDots(ch: string, spacing = 1.2): Dot[] {
+export function glyphDots(ch: string, spacing = 1.9): Dot[] {
   const strokes = GLYPHS[ch];
   if (!strokes) return [];
   const out: Dot[] = [];
@@ -125,7 +139,7 @@ export function glyphAdvance(ch: string): number {
 export type PlacedDot = Dot & { i: number };
 
 /** Lay out a whole string. Returns dots in glyph-space plus the total width. */
-export function textDots(text: string, spacing = 1.2, tracking = 1.6): { dots: PlacedDot[]; width: number } {
+export function textDots(text: string, spacing = 1.9, tracking = 2.2): { dots: PlacedDot[]; width: number } {
   let x = 0;
   const dots: PlacedDot[] = [];
   let i = 0;

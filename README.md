@@ -127,10 +127,17 @@ use it, search for the right one, or create it. Nothing uncertain is silently ac
 
 ### Images
 
-V1 deliberately does not generate images. Every recipe gets **Copy image prompt**,
+V1 deliberately does not *generate* images. Every recipe gets **Copy image prompt**,
 which combines a fixed global photography direction with that recipe's subject, so
 each shot belongs to the same library: top-down, soft diffused daylight, abundant,
 restrained, no hands, no text, no props, and the least vessel the food actually needs.
+
+The other half of that loop is the camera button on the recipe hero: generate the
+photo elsewhere, then add it. Images are downscaled to 1100px and re-encoded as JPEG
+under ~320 KB before storage — with Supabase they go to the `recipe-images` bucket
+(created by the migration), and without it they are kept as data URLs on the device,
+where localStorage has a hard quota measured in single-digit megabytes.
+
 Until a photo exists, the recipe plate renders a composed colour field keyed to its
 cuisine rather than an empty box.
 
@@ -142,6 +149,12 @@ White/fog environment, blurred colour fields under frosted glass, fine outlines,
 thin type, and instrument motifs — dotted numerals, dotted scales, radial arcs.
 Gradients are load-bearing, not decorative: they mark the surfaces that carry data
 and the ones you act on. Everything else stays white and quiet.
+
+Every gradient field carries white type, so two rules keep it readable: no blob may
+be near-white, and each field has a base fill plus a gentle legibility veil. Yellow-
+green and peach are the brightest hues in the palette and fail worst at the light
+end — the veil buys back the contrast without flattening the colour. Deep variants
+(`plate*`, `engage`) exist for surfaces where type sits edge to edge.
 
 Dotted numerals are traced from real numeral strokes rather than lit from a 5×7
 matrix (`src/lib/dotted/glyphs.ts`), sampled with pure maths so server and client

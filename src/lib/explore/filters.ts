@@ -12,6 +12,8 @@ export interface FilterState {
   volume: Quant;
   health: Quant;
   time: Quant;
+  /** cuisine is engaged like any other filter before its tags do anything */
+  cuisineOn: boolean;
   cuisines: string[];
   courses: CourseType[];
 }
@@ -22,6 +24,7 @@ export interface QuantSpec {
   key: QuantKey;
   label: string;
   /** the one-tap recommended setting */
+  /** the quick-preset word, e.g. "High protein" */
   preset: string;
   direction: 'atLeast' | 'atMost';
   unit: string;
@@ -37,7 +40,7 @@ export const QUANT_SPECS: Record<QuantKey, QuantSpec> = {
   protein: {
     key: 'protein',
     label: 'Protein',
-    preset: 'High',
+    preset: 'High protein',
     direction: 'atLeast',
     unit: 'g',
     min: 10,
@@ -50,7 +53,7 @@ export const QUANT_SPECS: Record<QuantKey, QuantSpec> = {
   calories: {
     key: 'calories',
     label: 'Calories',
-    preset: 'Low',
+    preset: 'Low calorie',
     direction: 'atMost',
     unit: 'kcal',
     min: 200,
@@ -63,7 +66,7 @@ export const QUANT_SPECS: Record<QuantKey, QuantSpec> = {
   volume: {
     key: 'volume',
     label: 'Volume',
-    preset: 'High',
+    preset: 'High volume',
     direction: 'atLeast',
     unit: '',
     min: 0,
@@ -110,6 +113,7 @@ export function defaultFilters(): FilterState {
     volume: { on: false, value: QUANT_SPECS.volume.default },
     health: { on: false, value: QUANT_SPECS.health.default },
     time: { on: false, value: QUANT_SPECS.time.default },
+    cuisineOn: false,
     cuisines: [],
     courses: [],
   };
@@ -118,7 +122,7 @@ export function defaultFilters(): FilterState {
 export function activeCount(f: FilterState): number {
   let n = 0;
   for (const k of QUANT_ORDER) if (f[k].on) n++;
-  if (f.cuisines.length) n++;
+  if (f.cuisineOn && f.cuisines.length) n++;
   if (f.courses.length) n++;
   return n;
 }

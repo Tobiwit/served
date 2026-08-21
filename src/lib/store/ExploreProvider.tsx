@@ -45,8 +45,14 @@ export function ExploreProvider({ children }: { children: React.ReactNode }) {
 
   const start = useCallback(() => setSession((s) => ({ ...s, started: true })), []);
 
+  // ruling something out and wanting more of it are mutually exclusive; boosting
+  // already clears the exclusion, so excluding has to clear the boost
   const exclude = useCallback((id: string) => {
-    setSession((s) => (s.excluded.includes(id) ? s : { ...s, excluded: [...s.excluded, id] }));
+    setSession((s) =>
+      s.excluded.includes(id)
+        ? s
+        : { ...s, excluded: [...s.excluded, id], boosted: s.boosted.filter((x) => x !== id) },
+    );
   }, []);
 
   const unexclude = useCallback((id: string) => {

@@ -27,51 +27,69 @@ export type Tone =
   | 'plateGreen'
   | 'plateCool'
   | 'plateRose'
-  | 'plateDusk';
+  | 'plateDusk'
+  | 'hero'
+  | 'heroThin';
 
 const TONES: Record<Tone, Blob[]> = {
   // warm light above, deep green below — the "score" card
   protein: [
-    { c: '#ffd0aa', x: 22, y: -6, r: 88 },
-    { c: '#f5b95f', x: 86, y: 2, r: 76 },
-    { c: '#d9f265', x: 8, y: 46, r: 78, o: 0.9 },
+    { c: '#f7bb87', x: 22, y: -6, r: 88 },
+    { c: '#eaa544', x: 86, y: 2, r: 76 },
+    { c: '#c5e356', x: 8, y: 46, r: 78, o: 0.9 },
     { c: '#4da566', x: 58, y: 74, r: 104 },
-    { c: '#2b7a49', x: 20, y: 118, r: 96 },
+    { c: '#25703f', x: 20, y: 118, r: 96 },
   ],
   calories: [
-    { c: '#ffe2c4', x: 8, y: 2, r: 82 },
-    { c: '#f5a951', x: 74, y: 24, r: 92 },
-    { c: '#ff8360', x: 96, y: 96, r: 88 },
-    { c: '#ffd0aa', x: 26, y: 96, r: 74, o: 0.85 },
+    { c: '#ffcb9b', x: 8, y: 2, r: 82 },
+    { c: '#ef9438', x: 74, y: 24, r: 92 },
+    { c: '#e9633c', x: 96, y: 96, r: 88 },
+    { c: '#f0a869', x: 26, y: 96, r: 74, o: 0.9 },
   ],
   volume: [
-    { c: '#dfe8fa', x: 6, y: 0, r: 80 },
-    { c: '#a5d8e6', x: 62, y: 18, r: 88 },
-    { c: '#8ba4d8', x: 92, y: 88, r: 90 },
-    { c: '#c9bcee', x: 16, y: 104, r: 84, o: 0.9 },
+    { c: '#bcd2ee', x: 6, y: 0, r: 80 },
+    { c: '#7fc0d4', x: 62, y: 18, r: 88 },
+    { c: '#6483c2', x: 92, y: 88, r: 90 },
+    { c: '#a698db', x: 16, y: 104, r: 84, o: 0.9 },
   ],
   health: [
-    { c: '#eef8c9', x: 12, y: -4, r: 76 },
-    { c: '#d9f265', x: 78, y: 12, r: 84 },
-    { c: '#79c77e', x: 30, y: 78, r: 96 },
-    { c: '#2b7a49', x: 96, y: 112, r: 86, o: 0.85 },
+    { c: '#cfe87c', x: 12, y: -4, r: 76 },
+    { c: '#a8d63f', x: 78, y: 12, r: 84 },
+    { c: '#4fa267', x: 30, y: 78, r: 96 },
+    { c: '#256b45', x: 96, y: 112, r: 86, o: 0.9 },
   ],
   time: [
-    { c: '#e4dcfa', x: 4, y: 4, r: 82 },
-    { c: '#c9bcee', x: 70, y: 6, r: 84 },
-    { c: '#8ba4d8', x: 18, y: 92, r: 82, o: 0.8 },
-    { c: '#ffa3c6', x: 98, y: 86, r: 84 },
+    { c: '#cbbff0', x: 4, y: 4, r: 82 },
+    { c: '#a693e0', x: 70, y: 6, r: 84 },
+    { c: '#6e86c9', x: 18, y: 92, r: 82, o: 0.85 },
+    { c: '#e888b4', x: 98, y: 86, r: 84 },
+  ],
+  // the readout at the top of the instrument, carrying the same depth as the rose
+  // recipe plates so the two surfaces read as the same material
+  hero: [
+    { c: '#ffb9d2', x: 14, y: -12, r: 76 },
+    { c: '#ec6f94', x: 64, y: 18, r: 90 },
+    { c: '#b8385f', x: 22, y: 78, r: 94 },
+    { c: '#6d1f3a', x: 96, y: 118, r: 92 },
+  ],
+  // same family, drained of its light for the "nothing matches" state
+  heroThin: [
+    { c: '#d9a3b6', x: 14, y: -12, r: 76 },
+    { c: '#b06179', x: 64, y: 18, r: 90 },
+    { c: '#7e2b48', x: 22, y: 78, r: 94 },
+    { c: '#4a1628', x: 96, y: 118, r: 92 },
   ],
   boost: [
-    { c: '#ffd7e6', x: 10, y: 0, r: 78 },
-    { c: '#ffa3c6', x: 68, y: 26, r: 88 },
-    { c: '#f277a4', x: 92, y: 98, r: 84 },
-    { c: '#ff8360', x: 22, y: 102, r: 70, o: 0.7 },
+    { c: '#ffb9d2', x: 10, y: 0, r: 78 },
+    { c: '#f486b2', x: 68, y: 26, r: 88 },
+    { c: '#d95a86', x: 92, y: 98, r: 84 },
+    { c: '#e86a4c', x: 22, y: 102, r: 70, o: 0.75 },
   ],
   course: [
-    { c: '#ffe6d2', x: 10, y: 6, r: 76 },
-    { c: '#c9bcee', x: 84, y: 14, r: 78 },
-    { c: '#a5d8e6', x: 40, y: 100, r: 84, o: 0.85 },
+    { c: '#f4c9a8', x: 10, y: 6, r: 76 },
+    { c: '#a894dd', x: 84, y: 14, r: 82 },
+    { c: '#6fa9c4', x: 40, y: 104, r: 88, o: 0.9 },
+    { c: '#5c6bb0', x: 96, y: 116, r: 78 },
   ],
   neutral: [
     { c: '#ffffff', x: 20, y: 0, r: 80 },
@@ -130,6 +148,15 @@ const TONES: Record<Tone, Blob[]> = {
  * between them expose the white surface underneath as blown-out holes.
  */
 const BASE: Partial<Record<Tone, string>> = {
+  course: '#8b7fc0',
+  hero: '#a83259',
+  heroThin: '#6f2a42',
+  protein: '#57933f',
+  calories: '#e28a45',
+  volume: '#6d8cc4',
+  health: '#5ba055',
+  time: '#8f8ad2',
+  boost: '#e77ba0',
   plateWarm: '#8a3520',
   plateGreen: '#1f5c3c',
   plateCool: '#2e5473',
@@ -140,6 +167,8 @@ const BASE: Partial<Record<Tone, string>> = {
 
 type Props = {
   tone: Tone;
+  /** darken the field slightly so white type holds contrast over light hues */
+  veil?: boolean;
   /** 0..1 — how present the colour is */
   intensity?: number;
   blur?: number;
@@ -148,9 +177,9 @@ type Props = {
   className?: string;
 };
 
-function GradientFieldImpl({ tone, intensity = 1, blur = 26, rotate = 0, className }: Props) {
+function GradientFieldImpl({ tone, intensity = 1, blur = 26, rotate = 0, veil = true, className }: Props) {
   const blobs = TONES[tone] ?? TONES.neutral;
-  const dark = tone === 'engage' || tone.startsWith('plate');
+  const dark = tone === 'engage' || tone === 'hero' || tone === 'heroThin' || tone.startsWith('plate');
   return (
     <div
       className={className}
@@ -190,6 +219,20 @@ function GradientFieldImpl({ tone, intensity = 1, blur = 26, rotate = 0, classNa
           />
         ))}
       </div>
+      {/* Legibility veil. Yellow-green and peach are the brightest hues in the
+          palette, and white type on them fails badly at the light end. A gentle
+          darkening keeps the colour and buys back the contrast. */}
+      {veil && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(180deg, rgba(14,15,17,0.26) 0%, rgba(14,15,17,0.1) 42%, rgba(14,15,17,0.16) 68%, rgba(14,15,17,0.32) 100%)',
+          }}
+        />
+      )}
+
       {/* frosted sheen — the light sitting on the glass, not in it */}
       <div
         style={{

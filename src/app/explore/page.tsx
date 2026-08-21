@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
-import { buildCandidates, evaluate, exploreIngredients, pickNext, type Candidate } from '@/lib/explore/candidates';
+import { buildCandidates, evaluate, exploreIngredients, optionIds, pickNext, type Candidate } from '@/lib/explore/candidates';
 import { RecipePlate } from '@/components/explore/RecipePlate';
-import { IngredientCapsule } from '@/components/explore/IngredientCapsule';
+import { IngredientCapsule, type CapsuleOption } from '@/components/explore/IngredientCapsule';
 import { Mechanism, MECHANISM_MS } from '@/components/explore/Mechanism';
 import { Toast } from '@/components/explore/Toast';
 import { ExploreTopBar, SkipBar, Exhausted } from '@/components/explore/ExploreChrome';
+import { RunTallies } from '@/components/explore/RunTallies';
+import { ease } from '@/lib/motion';
 
 /** Content swaps a third of the way into the sweep, behind the frosted plate. */
 const SWAP_AT = MECHANISM_MS * 0.34;
@@ -97,39 +99,64 @@ export default function ExplorePage() {
     if (current) advance(1, true);
   }, [current, advance]);
 
-  const onExclude = useCallback(
-    (ingredientId: string, name: string) => {
+  const onKill = useCallback(
+    (ingredientId: string) => {
       if (!current) return;
-      // core takes the recipe with it; optional and substitutable leave it standing
-      const isCore = current.recipe.ingredients.some(
-        (ri) => ri.ingredient_id === ingredientId && ri.role === 'core',
-      );
       exclude(ingredientId);
-      flash(`${name} excluded`, () => {
-        unexclude(ingredientId);
-        setToast(null);
-      });
-      if (isCore) advance(1, false);
+      // ask the evaluator rather than re-deriving the rules here: this covers a
+      // dead core ingredient and a slot whose every option is now gone
+      const after = new Set(excluded);
+      after.add(ingredientId);
+      if (!evaluate(current.recipe, current.analysis, after, boosted)) advance(1, false);
     },
-    [current, exclude, unexclude, flash, advance],
+    [current, exclude, unexclude, flash, advance, excluded, boosted],
   );
 
-  const onBoost = useCallback(
-    (ingredientId: string, name: string) => {
-      const was = boosted.has(ingredientId);
-      toggleBoost(ingredientId);
-      flash(was ? `${name} no longer prioritised` : `More recipes with ${name}`);
-    },
-    [boosted, toggleBoost, flash],
-  );
+  const restore = useCallback((ingredientId: string) => unexclude(ingredientId), [unexclude]);
 
-  // an excluded ingredient leaves the capsule row immediately, even if the recipe stays
+  const onBoost = useCallback((ingredientId: string) => toggleBoost(ingredientId), [toggleBoost]);
+
+  /**
+   * One capsule per ingredient slot.
+   *
+   * A swappable slot reveals its options one at a time: every option already ruled
+   * out, plus the first that survives. Anything further back stays hidden behind
+   * the ⇄ until it is needed. Restoring an earlier option collapses the chain again.
+   */
   const capsules = useMemo(() => {
     if (!current) return [];
-    return exploreIngredients(current.recipe, ingredientIndex).filter(
-      (ri) => !(ri.ingredient_id && excluded.has(ri.ingredient_id)),
-    );
-  }, [current, ingredientIndex, excluded]);
+    return exploreIngredients(current.recipe, ingredientIndex)
+      .map((ri) => {
+        const ids = optionIds(ri);
+        const names = new Map<string, string>();
+        if (ri.ingredient_id) names.set(ri.ingredient_id, ri.display_name);
+        for (const sub of ri.substitutions) {
+          if (sub.substitute_ingredient_id) names.set(sub.substitute_ingredient_id, sub.display_name);
+        }
+
+        const isGroup = ri.role === 'substitutable' && ids.length > 1;
+        const pool = isGroup ? ids : ids.slice(0, 1);
+
+        const revealed: CapsuleOption[] = [];
+        for (const id of pool) {
+          const killed = excluded.has(id);
+          revealed.push({ id, name: names.get(id) ?? id, killed, inUse: !killed, boosted: boosted.has(id) });
+          if (!killed) break;
+        }
+
+        const primaryDead = !!ri.ingredient_id && excluded.has(ri.ingredient_id);
+        return {
+          key: ri.id,
+          revealed,
+          hasMore: revealed.length < pool.length,
+          swapped: isGroup && primaryDead,
+          optional: ri.role === 'optional',
+          // a plain ingredient with nothing to fall back on simply leaves the row
+          drop: !isGroup && primaryDead,
+        };
+      })
+      .filter((c) => !c.drop);
+  }, [current, ingredientIndex, excluded, boosted]);
 
   const resetRun = useCallback(() => {
     resetKeepFilters();
@@ -183,40 +210,65 @@ export default function ExplorePage() {
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'space-between',
-              paddingTop: 18,
+              paddingTop: 16,
               minHeight: 0,
             }}
           >
-            <div>
-              <div
-                style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}
-              >
-                <p className="t-micro t-dim" style={{ margin: 0 }}>
-                  Tap to remove · hold to prioritise
-                </p>
-                {current.swaps.length > 0 && (
-                  <p className="t-micro t-dim-2" style={{ margin: 0 }}>
-                    {current.swaps.length} swap{current.swaps.length === 1 ? '' : 's'}
-                  </p>
-                )}
-              </div>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                flexWrap: 'wrap',
+                flex: '0 0 auto',
+              }}
+            >
+              <p className="t-micro t-dim" style={{ margin: 0 }}>
+                Tap to rule out · hold to prioritise
+              </p>
+              <RunTallies
+                excluded={session.excluded}
+                boosted={session.boosted}
+                index={ingredientIndex}
+                onRestore={unexclude}
+                onUnboost={toggleBoost}
+              />
+            </div>
 
-              <motion.div layout style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                <AnimatePresence mode="popLayout">
-                  {capsules.map((ri, i) => (
-                    <IngredientCapsule
-                      key={`${current.recipe.id}-${ri.id}`}
-                      ri={ri}
-                      index={i}
-                      boosted={!!ri.ingredient_id && boosted.has(ri.ingredient_id)}
-                      swapped={ri.role === 'substitutable' && current.swaps.includes(ri.display_name)}
-                      onExclude={() => ri.ingredient_id && onExclude(ri.ingredient_id, ri.display_name)}
-                      onBoost={() => ri.ingredient_id && onBoost(ri.ingredient_id, ri.display_name)}
-                    />
-                  ))}
-                </AnimatePresence>
-              </motion.div>
+            {/*
+              The capsule field owns a fixed share of the screen and clips. Letting
+              it size to its contents meant every recipe change shoved the action
+              bar up and down the screen.
+            */}
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', paddingTop: 12 }}>
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={current.recipe.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10, transition: { duration: 0.18, ease: ease.depart } }}
+                  transition={{ duration: 0.34, ease: ease.arrive }}
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignContent: 'flex-start' }}
+                >
+                  {/* a recipe change moves the whole field as one; this inner
+                      presence only handles capsules leaving within a recipe */}
+                  <AnimatePresence initial={false}>
+                    {capsules.map((c, i) => (
+                      <IngredientCapsule
+                        key={c.key}
+                        revealed={c.revealed}
+                        hasMore={c.hasMore}
+                        index={i}
+                        swapped={c.swapped}
+                        optional={c.optional}
+                        onTap={(o) => onKill(o.id)}
+                        onHold={(o) => (o.killed ? restore(o.id) : onBoost(o.id))}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              </AnimatePresence>
             </div>
 
             <SkipBar onSkip={onSkip} onCook={() => router.push(`/recipe/${current.recipe.id}`)} />
