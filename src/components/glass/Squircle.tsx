@@ -103,9 +103,18 @@ export function Squircle({ radius = 30, stroke = 'ink', className, style, childr
       className={className}
       style={{
         position: 'relative',
-        // a matching border-radius keeps the shape sane for the first paint and
-        // for anything that ignores clip-path
-        borderRadius: radius,
+        /**
+         * Before the box is measured, a matching border-radius keeps the shape sane
+         * for the first paint. Once the clip-path exists it has to go back to zero.
+         *
+         * Everything inside — the colour field, the grain, the idle hit area — is
+         * laid out with `border-radius: inherit`, and a *circular* radius on those
+         * layers cuts the corner back further than the squircle does. The card then
+         * paints a colour corner on one curve and its outline on another, which
+         * reads as the radius tightening the moment a panel lights up. The clip-path
+         * already clips every descendant, so the inner layers must stay square.
+         */
+        borderRadius: ready ? 0 : radius,
         clipPath: ready ? `path("${d}")` : undefined,
         ...style,
       }}

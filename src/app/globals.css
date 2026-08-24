@@ -244,6 +244,57 @@ a {
 }
 
 /* ============================================================
+   THE WANTED MARKER
+   Two rows of dots crawling around a prioritised ingredient, the
+   same offset-and-drift the rings under the Explore button use.
+
+   In CSS rather than in the motion library: a keyframed
+   `strokeDashoffset` there resolves straight to its final frame,
+   because motion drives stroke-dashoffset itself for pathLength.
+   The reduced-motion rule at the foot of this file stops both.
+   ============================================================ */
+
+.boost-row {
+  /* a zero-length dash with a round cap draws a true dot, not a short line */
+  stroke-dasharray: 0.01 5.4;
+  stroke-linecap: round;
+  /* lifts the dots off whatever sits behind the capsule */
+  filter: drop-shadow(0 0 1.6px rgba(255, 255, 255, 0.85));
+}
+
+/* hugs the outline and holds the pill marked at rest */
+.boost-row-inner {
+  stroke-width: 2.1;
+  animation: boost-drift-in 14s linear infinite;
+}
+
+/* fainter, further out, and half a dot out of step so the two never align */
+.boost-row-outer {
+  stroke-width: 1.7;
+  opacity: 0.42;
+  animation: boost-drift-out 22s linear infinite;
+}
+
+/* one full dash period, so the loop is seamless at any pill width */
+@keyframes boost-drift-in {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 5.4px;
+  }
+}
+
+@keyframes boost-drift-out {
+  from {
+    stroke-dashoffset: 2.7px;
+  }
+  to {
+    stroke-dashoffset: -2.7px;
+  }
+}
+
+/* ============================================================
    SCROLL / SHELL
    ============================================================ */
 

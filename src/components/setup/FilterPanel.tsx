@@ -13,7 +13,7 @@ import { ease, spring } from '@/lib/motion';
  *
  *   full     label, then the reading, then the scale filling what is left
  *   compact  label and reading share one line, scale below — for short cards
- *   row      reading on the left, an upright scale down the right edge
+ *   row      label and reading on the left, the scale filling the rest of the line
  */
 
 type Variant = 'full' | 'compact' | 'row';
@@ -158,9 +158,11 @@ export function FilterPanel({
           </>
         ) : (
           <>
+            {/* In a row the reading takes only what it needs — the scale beside it is
+                a drum you turn, and it wants every pixel of travel it can get. */}
             <div
               style={{
-                flex: variant === 'row' ? '1 1 auto' : '0 0 auto',
+                flex: '0 0 auto',
                 minWidth: 0,
                 display: 'flex',
                 flexDirection: 'column',
@@ -192,8 +194,9 @@ export function FilterPanel({
 
             <div
               style={{
-                flex: variant === 'row' ? '0 0 auto' : '1 1 auto',
+                flex: '1 1 auto',
                 minHeight: 0,
+                minWidth: 0,
                 width: variant === 'row' ? undefined : '100%',
                 display: 'flex',
                 alignItems: variant === 'row' || fill ? 'stretch' : 'flex-end',
@@ -202,7 +205,7 @@ export function FilterPanel({
               }}
             >
               {!active ? null : variant === 'row' ? (
-                children
+                <div style={{ width: '100%', minWidth: 0 }}>{children}</div>
               ) : (
                 <div style={{ width: '100%', height: fill ? '100%' : undefined }}>{children}</div>
               )}

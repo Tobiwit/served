@@ -122,6 +122,11 @@ export default function ExplorePage() {
    * A swappable slot reveals its options one at a time: every option already ruled
    * out, plus the first that survives. Anything further back stays hidden behind
    * the ⇄ until it is needed. Restoring an earlier option collapses the chain again.
+   *
+   * The recipe's own order decides which option leads — except where one of them is
+   * something you said you wanted, which moves to the front. Asking for halloumi and
+   * then being shown the chicken version of a dish that offers both is the app
+   * ignoring the one thing you told it.
    */
   const capsules = useMemo(() => {
     if (!current) return [];
@@ -135,7 +140,10 @@ export default function ExplorePage() {
         }
 
         const isGroup = ri.role === 'substitutable' && ids.length > 1;
-        const pool = isGroup ? ids : ids.slice(0, 1);
+        // stable, so anything unboosted keeps the order the recipe wrote it in
+        const pool = isGroup
+          ? [...ids].sort((a, b) => Number(boosted.has(b)) - Number(boosted.has(a)))
+          : ids.slice(0, 1);
 
         const revealed: CapsuleOption[] = [];
         for (const id of pool) {
@@ -144,7 +152,8 @@ export default function ExplorePage() {
           if (!killed) break;
         }
 
-        const primaryDead = !!ri.ingredient_id && excluded.has(ri.ingredient_id);
+        // "swapped" means the slot is no longer running on the option it leads with
+        const primaryDead = !!pool[0] && excluded.has(pool[0]);
         return {
           key: ri.id,
           revealed,

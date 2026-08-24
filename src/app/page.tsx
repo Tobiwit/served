@@ -123,8 +123,11 @@ export default function SetupPage() {
 
       {/* protein + calories on the left, time standing full height on the right */}
       <section style={{ flex: '1.05 1 0', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 9, minHeight: 0 }}>
-        <div style={{ display: 'grid', gridTemplateRows: '2fr 1fr', gap: 9, minHeight: 0 }}>
-          <FilterPanel {...panel('protein')} numberSize={46}>
+        {/* The calorie drum is a horizontal instrument now, so this column is split
+            1.62 : 1 rather than 2 : 1 — the drum needs a band deep enough to carry
+            its ticks and their captions, and protein gives up the slack it had. */}
+        <div style={{ display: 'grid', gridTemplateRows: '1.62fr 1fr', gap: 9, minHeight: 0 }}>
+          <FilterPanel {...panel('protein')} numberSize={42}>
             <DottedScale
               min={QUANT_SPECS.protein.min}
               max={QUANT_SPECS.protein.max}
@@ -135,12 +138,14 @@ export default function SetupPage() {
               labels={QUANT_SPECS.protein.labels}
               unit="g"
               label="Protein"
-              height={48}
+              height={44}
               ink={f.protein.on ? 'lume' : 'ink'}
             />
           </FilterPanel>
 
-          <FilterPanel {...panel('calories')} variant="row" numberSize={30} radius={26}>
+          {/* compact, not row: the drum is a horizontal instrument and every pixel of
+              card width is travel under the thumb */}
+          <FilterPanel {...panel('calories')} variant="compact" numberSize={20} radius={26}>
             <GlassDial
               min={QUANT_SPECS.calories.min}
               max={QUANT_SPECS.calories.max}
@@ -149,7 +154,8 @@ export default function SetupPage() {
               onChange={(v) => setValue('calories', v)}
               active={f.calories.on}
               label="Calories"
-              width={58}
+              unit="kcal"
+              height={38}
             />
           </FilterPanel>
         </div>
@@ -194,7 +200,7 @@ export default function SetupPage() {
               active={f.volume.on}
               label="Volume"
               ticks={['Any', 'Mid', 'Large']}
-              height={58}
+              height={62}
             />
           </FilterPanel>
 

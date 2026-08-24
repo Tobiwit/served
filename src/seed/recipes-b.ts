@@ -33,7 +33,7 @@ export const SEEDS_B: RecipeSeed[] = [
     prep: 10,
     cook: 30,
     cuisine: 'Other',
-    course: 'dinner',
+    course: 'main',
     tags: ['high protein', 'batch'],
     subs: { Harissa: ['Gochujang'] },
     ing: [
@@ -63,7 +63,7 @@ export const SEEDS_B: RecipeSeed[] = [
     prep: 10,
     cook: 10,
     cuisine: 'Mediterranean',
-    course: 'lunch',
+    course: 'main',
     tags: ['high volume'],
     subs: { Halloumi: ['Firm tofu', 'Chicken breast'] },
     ing: [
@@ -93,7 +93,7 @@ export const SEEDS_B: RecipeSeed[] = [
     prep: 10,
     cook: 20,
     cuisine: 'Mexican',
-    course: 'dinner',
+    course: 'main',
     tags: ['vegetarian'],
     subs: { Avocado: ['Greek yogurt 0%'] },
     ing: [
@@ -150,7 +150,7 @@ export const SEEDS_B: RecipeSeed[] = [
     prep: 10,
     cook: 0,
     cuisine: 'Italian',
-    course: 'lunch',
+    course: 'main',
     tags: ['high protein', 'quick', 'no cook'],
     subs: { 'Cannellini beans': ['Chickpeas'] },
     ing: [

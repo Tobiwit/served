@@ -4,6 +4,7 @@ import { use, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
+import { COURSE_LABEL } from '@/lib/db/types';
 import { RecipeImage } from '@/components/explore/RecipeImage';
 import { NutritionCard } from '@/components/recipe/NutritionCard';
 import { ScorePanel } from '@/components/recipe/ScorePanel';
@@ -86,6 +87,17 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
           </FloatControl>
 
           <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
+            <FloatControl label="Edit recipe" onClick={() => router.push(`/recipe/${recipe.id}/edit`)}>
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
+                <path
+                  d="M10.1 2.4a1.5 1.5 0 0 1 2.1 2.1l-6.6 6.6-2.8.7.7-2.8z"
+                  stroke="currentColor"
+                  strokeWidth="1.1"
+                  strokeLinejoin="round"
+                />
+                <path d="M9.1 3.4l2.1 2.1" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+              </svg>
+            </FloatControl>
             <PhotoControl
               recipe={recipe}
               onSave={async (image_url) => void (await saveRecipe({ ...recipe, image_url }))}
@@ -123,7 +135,11 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
             </p>
           )}
           <p className="t-micro t-dim-2" style={{ margin: '12px 0 0' }}>
-            {[recipe.cuisine, recipe.course_type, recipe.total_minutes ? `${recipe.total_minutes} min` : null]
+            {[
+              recipe.cuisine,
+              recipe.course_type ? COURSE_LABEL[recipe.course_type] : null,
+              recipe.total_minutes ? `${recipe.total_minutes} min` : null,
+            ]
               .filter(Boolean)
               .join(' · ')}
           </p>

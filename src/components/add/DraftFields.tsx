@@ -1,6 +1,6 @@
 'use client';
 
-import { COURSE_TYPES, CUISINES, type CourseType } from '@/lib/db/types';
+import { COURSE_LABEL, COURSE_TYPES, CUISINES, type CourseType } from '@/lib/db/types';
 import type { Draft } from '@/lib/add/draft';
 
 /** Title, description, servings, times, cuisine and course for a draft recipe. */
@@ -56,7 +56,7 @@ export function DraftHeader({ draft, onChange }: { draft: Draft; onChange: (c: P
           {COURSE_TYPES.map((c) => (
             <Pick
               key={c}
-              label={c[0].toUpperCase() + c.slice(1)}
+              label={COURSE_LABEL[c]}
               on={draft.courseType === c}
               onClick={() => onChange({ courseType: draft.courseType === c ? null : (c as CourseType) })}
             />

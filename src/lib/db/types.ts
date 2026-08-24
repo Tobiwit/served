@@ -108,6 +108,14 @@ export interface IngredientSubstitution {
   id: string;
   substitute_ingredient_id: string | null;
   display_name: string;
+  /**
+   * A stand-in is rarely a like-for-like swap by weight: 80 g of halloumi is not
+   * 80 g of tofu, and a tablespoon of tahini is not a tablespoon of yoghurt. Left
+   * null these fall back to the line the substitution hangs off.
+   */
+  amount: number | null;
+  unit: string | null;
+  grams: number | null;
   amount_multiplier: number | null;
   notes: string | null;
 }
@@ -131,9 +139,30 @@ export interface RecipeInstruction {
   text: string;
 }
 
-export type CourseType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'dessert';
+/**
+ * Lunch and dinner were never a distinction this app could act on: the same bowl of
+ * noodles answers both, so tagging one of them only ever hid recipes from the other.
+ * They are one course — `main`.
+ */
+export type CourseType = 'breakfast' | 'main' | 'snack' | 'dessert';
 
-export const COURSE_TYPES: CourseType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
+export const COURSE_TYPES: CourseType[] = ['breakfast', 'main', 'snack', 'dessert'];
+
+export const COURSE_LABEL: Record<CourseType, string> = {
+  breakfast: 'Breakfast',
+  main: 'Main',
+  snack: 'Snack',
+  dessert: 'Dessert',
+};
+
+/** Recipes saved before the merge still carry the old tags. */
+const LEGACY_COURSE: Record<string, CourseType> = { lunch: 'main', dinner: 'main' };
+
+export function normalizeCourse(value: string | null | undefined): CourseType | null {
+  if (!value) return null;
+  if (LEGACY_COURSE[value]) return LEGACY_COURSE[value];
+  return (COURSE_TYPES as string[]).includes(value) ? (value as CourseType) : null;
+}
 
 export const CUISINES = [
   'Italian',

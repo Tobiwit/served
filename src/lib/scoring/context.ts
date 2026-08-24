@@ -34,15 +34,54 @@ export const PROCESSED: IngredientCategory[] = [
   'sauce_condiment',
   'fat_solid',
 ];
-export const UNSATURATED: IngredientCategory[] = ['nuts_seeds', 'oil', 'seafood'];
-export const SATURATED: IngredientCategory[] = [
-  'fat_solid',
-  'cheese',
-  'processed_meat',
-  'dairy_full_fat',
-  'protein_fatty',
-];
 export const SALTY: IngredientCategory[] = ['sauce_condiment', 'cheese', 'processed_meat'];
+
+/**
+ * Roughly what share of this kind of food's own fat is saturated.
+ *
+ * The category answers *what kind of fat*, which no macro can: butter and olive oil
+ * are both essentially pure fat and belong at opposite ends. The ingredient's
+ * `fat_100g` answers *how much of it*, which no category can: a light mozzarella and
+ * a mascarpone are the same shelf and not remotely the same fat.
+ *
+ * Membership of a "saturated" list used to answer both at once, weighted by the mass
+ * of the ingredient — so a dish took the full saturated penalty for containing any
+ * cheese at all, and a light one was scored exactly like double cream. Multiplying
+ * these shares by the grams of fat actually present is the whole fix, and it needs no
+ * data the ingredients do not already carry.
+ *
+ * Ordinary food-composition figures, kept deliberately coarse.
+ */
+export const SATURATED_SHARE: Record<IngredientCategory, number> = {
+  vegetable: 0.2,
+  fruit: 0.18,
+  legume: 0.16,
+  whole_grain: 0.2,
+  refined_grain: 0.24,
+  protein_lean: 0.3,
+  protein_fatty: 0.35,
+  processed_meat: 0.38,
+  seafood: 0.22,
+  egg: 0.31,
+  dairy_low_fat: 0.62,
+  dairy_full_fat: 0.62,
+  cheese: 0.63,
+  nuts_seeds: 0.11,
+  oil: 0.14,
+  fat_solid: 0.65,
+  sweetener: 0.3,
+  sauce_condiment: 0.2,
+  spice: 0.2,
+  beverage: 0.3,
+  other: 0.33,
+};
+
+/**
+ * The share of fat above which a dish reads as saturated-leaning. A third is about
+ * where an ordinary mixed diet sits, so that is the point the term is worth nothing
+ * either way.
+ */
+export const SATURATED_NEUTRAL = 0.33;
 
 export interface ScoreContext {
   nutrition: NutritionResult;
@@ -54,6 +93,10 @@ export interface ScoreContext {
   fiberPerServing: number | null;
   /** mass fraction 0..1 for a set of categories */
   fraction: (cats: IngredientCategory[]) => number;
+  /** grams of fat per serving, over the ingredients that carry a fat value */
+  fatPerServing: number | null;
+  /** 0..1 — how much of that fat comes from saturated-leaning sources */
+  saturatedShare: number | null;
   /** estimated water share of total mass, 0..1 */
   waterFraction: number;
   /** too little data to score honestly */
@@ -67,6 +110,8 @@ export function buildContext(recipe: Recipe, index: Map<string, Ingredient>): Sc
   const byCategory = new Map<IngredientCategory, number>();
   let mass = 0;
   let water = 0;
+  let fat = 0;
+  let saturated = 0;
 
   for (const ri of recipe.ingredients) {
     if (ri.grams == null || ri.grams <= 0) continue;
@@ -76,6 +121,13 @@ export function buildContext(recipe: Recipe, index: Map<string, Ingredient>): Sc
     mass += ri.grams;
     const w = ing?.water_100g ?? WATER_DEFAULT[cat];
     water += (ri.grams * w) / 100;
+
+    // an unknown fat value stays unknown here too, exactly as it does in the sums
+    if (ing?.fat_100g != null) {
+      const grams = (ri.grams * ing.fat_100g) / 100;
+      fat += grams;
+      saturated += grams * SATURATED_SHARE[cat];
+    }
   }
 
   const gramsPerServing = mass / servings;
@@ -89,6 +141,8 @@ export function buildContext(recipe: Recipe, index: Map<string, Ingredient>): Sc
     proteinDensity: protein != null && kcal != null && kcal > 0 ? (protein / kcal) * 100 : null,
     fiberPerServing: nutrition.perServing.fiber,
     fraction: (cats) => (mass > 0 ? cats.reduce((a, c) => a + (byCategory.get(c) ?? 0), 0) / mass : 0),
+    fatPerServing: fat > 0 ? fat / servings : null,
+    saturatedShare: fat > 0 ? saturated / fat : null,
     waterFraction: mass > 0 ? water / mass : 0,
     thin: mass <= 0 || nutrition.completeness < 0.5,
   };

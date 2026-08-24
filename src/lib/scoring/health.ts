@@ -1,5 +1,5 @@
 import type { Ingredient, Recipe } from '@/lib/db/types';
-import { buildContext, PRODUCE, PROCESSED, ramp, SALTY, SATURATED, UNSATURATED, type ScoreContext } from './context';
+import { buildContext, PRODUCE, PROCESSED, ramp, SALTY, SATURATED_NEUTRAL, type ScoreContext } from './context';
 
 /**
  * Health Score. An explicit, tunable heuristic, not a medical claim.
@@ -8,6 +8,11 @@ import { buildContext, PRODUCE, PROCESSED, ramp, SALTY, SATURATED, UNSATURATED, 
  * whole foods carry most of the upside (up to +58 between them) while low calorie
  * density can contribute at most +7. A 90 kcal bowl of nothing will not outrank a
  * 620 kcal plate of chicken, lentils and vegetables, which is the entire point.
+ *
+ * Protein, fibre and calorie density are read from the summed macros. Produce, whole
+ * food, added sugar and salt are read from ingredient categories, because no macro
+ * distinguishes a lentil from a lozenge. Fat is the one term that needs both: the
+ * category says what kind of fat it is, the grams say how much.
  */
 
 export const HEALTH_CONFIG = {
@@ -20,9 +25,16 @@ export const HEALTH_CONFIG = {
   wholeFood: { lo: 0.4, hi: 0.99, min: -10, max: 6 },
   lightDensity: { lo: 175, hi: 85, min: 0, max: 5 },
   heavyDensity: { lo: 200, hi: 380, min: 0, max: -16 },
-  fatQuality: { lo: -0.12, hi: 0.14, min: -7, max: 5 },
+  /**
+   * Fat is judged on how much of it is saturated, and only as loudly as there is fat
+   * to judge: `quiet` to `loud` grams per serving fades the whole term in, so a dish
+   * with a smear of butter is not marked as if it were fried in it.
+   */
+  fatQuality: { quiet: 2, loud: 10, min: -7, max: 5 },
   addedSugar: { lo: 0.012, hi: 0.1, min: 0, max: -12 },
-  sodium: { lo: 0.035, hi: 0.16, min: 0, max: -9 },
+  // salt is a preference as much as a health signal, and this one is a blunt
+  // category proxy rather than a sodium figure — it should not swing a score
+  sodium: { lo: 0.035, hi: 0.16, min: 0, max: -3 },
 };
 
 export interface ScoreFactor {
@@ -80,10 +92,21 @@ export function healthScoreFromContext(ctx: ScoreContext): ScoreResult {
     if (heavy < -0.5) f.push({ label: 'Very calorie dense', delta: heavy });
   }
 
-  const fatBalance = ctx.fraction(UNSATURATED) - ctx.fraction(SATURATED);
-  const fatDelta = ramp(fatBalance, c.fatQuality.lo, c.fatQuality.hi, c.fatQuality.min, c.fatQuality.max);
-  if (Math.abs(fatDelta) > 1.5) {
-    f.push({ label: fatDelta > 0 ? 'Mostly unsaturated fats' : 'High in saturated fat', delta: fatDelta });
+  /**
+   * Fat quality, weighted by the fat that is actually there.
+   *
+   * `quality` runs +1 (nothing saturated) through 0 (a third of the fat, about where
+   * an ordinary mixed diet sits) to -1 (two thirds), and `presence` fades the whole
+   * judgement in with the grams. The two together are what stop a light mozzarella
+   * being scored as harshly as a mascarpone, which the old mass-fraction version did.
+   */
+  if (ctx.saturatedShare != null && ctx.fatPerServing != null) {
+    const quality = Math.max(-1, Math.min(1, (SATURATED_NEUTRAL - ctx.saturatedShare) / SATURATED_NEUTRAL));
+    const presence = ramp(ctx.fatPerServing, c.fatQuality.quiet, c.fatQuality.loud, 0, 1);
+    const fatDelta = quality * presence * (quality > 0 ? c.fatQuality.max : -c.fatQuality.min);
+    if (Math.abs(fatDelta) > 1.2) {
+      f.push({ label: fatDelta > 0 ? 'Mostly unsaturated fats' : 'High in saturated fat', delta: fatDelta });
+    }
   }
 
   const sugar = ctx.fraction(['sweetener']);

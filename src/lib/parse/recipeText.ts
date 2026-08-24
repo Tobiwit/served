@@ -183,8 +183,7 @@ function findNumber(text: string, patterns: RegExp[]): number | null {
 
 const COURSE_HINTS: [RegExp, CourseType][] = [
   [/\b(breakfast|brunch|frühstück)\b/i, 'breakfast'],
-  [/\b(lunch|mittag)\b/i, 'lunch'],
-  [/\b(dinner|supper|abendessen)\b/i, 'dinner'],
+  [/\b(lunch|mittag|dinner|supper|abendessen|main course|main)\b/i, 'main'],
   [/\b(snack)\b/i, 'snack'],
   [/\b(dessert|pudding|nachtisch)\b/i, 'dessert'],
 ];

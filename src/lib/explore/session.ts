@@ -1,3 +1,4 @@
+import { normalizeCourse } from '@/lib/db/types';
 import type { FilterState } from './filters';
 import { defaultFilters } from './filters';
 
@@ -36,7 +37,10 @@ export function loadSession(): ExploreSession {
     const parsed = JSON.parse(raw) as ExploreSession;
     // a new day is a new mood
     if (parsed.date !== today()) return emptySession();
-    return { ...emptySession(), ...parsed, filters: { ...defaultFilters(), ...parsed.filters } };
+    const filters = { ...defaultFilters(), ...parsed.filters };
+    // a session stored yesterday can still name a course that no longer exists
+    filters.courses = [...new Set(filters.courses.map(normalizeCourse).filter((c) => c !== null))];
+    return { ...emptySession(), ...parsed, filters };
   } catch {
     return emptySession();
   }

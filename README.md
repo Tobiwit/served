@@ -45,9 +45,9 @@ NEXT_PUBLIC_SUPABASE_URL=...
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-Apply `supabase/migrations/0001_init.sql` first. Both adapters implement the same
-`Repo` interface in `src/lib/db/adapter.ts`; nothing above that line knows which is
-in use.
+Apply the migrations in `supabase/migrations` in order. Both adapters implement the
+same `Repo` interface in `src/lib/db/adapter.ts`; nothing above that line knows which
+is in use.
 
 ---
 
@@ -55,15 +55,15 @@ in use.
 
 ```
 src/
-  app/                 routes: setup (/), explore, recipe/[id], library, add,
-                       ingredients, settings, manifest + generated icons
+  app/                 routes: setup (/), explore, recipe/[id], recipe/[id]/edit,
+                       library, add, ingredients, settings, manifest + icons
   components/
     glass/             GradientField — the blurred colour field under frosted glass
     instrument/        dotted numerals, dotted scale, arc gauge, dot bars, ripple
     setup/             match readout, quantitative filter modules, chips, launch
     explore/           recipe plate, ingredient capsules, the glass mechanism
     recipe/            nutrition, score panels, servings, image prompt
-    add/               match rows, bottom sheet, new-ingredient form
+    add/               the draft editor, match rows, bottom sheet, new-ingredient form
   lib/
     db/                domain types + local and Supabase adapters
     nutrition/         unit conversion and unknown-aware calculation
@@ -86,6 +86,13 @@ Grams are the unit that matters. `toGrams` resolves per-ingredient conversions f
 (1 tbsp olive oil is 13.5 g, 1 tbsp honey is 21 g), then a conservative global table,
 and returns `null` rather than guessing.
 
+In the editor grams is therefore a *derived* readout, not a third field beside the
+amount and the unit: the row says what it weighs and where that number came from, and
+you only type one when it genuinely cannot be worked out. That happens honestly in two
+cases — a count unit with no per-ingredient conversion (a slice, a clove), and a volume
+the water-density table gets wrong (a cup of flour resolves to 240 g and is nearer
+120). Adjusting corrects the weight without lying about the recipe's own wording.
+
 ### The two scores
 
 Both are explicit heuristics with exported, tunable configs — not medical claims —
@@ -96,7 +103,15 @@ density, fibre, produce share, whole-food share, calorie density, fat quality, a
 sugar and salty components. Low calorie density contributes at most +5, while protein,
 fibre and produce are worth up to +42 between them — so a small plate of nothing never
 outranks a substantial plate of real food. Across the starter collection the scores
-span 40–96.
+span 43–94.
+
+Protein, fibre and calorie density come from the summed macros. Produce, whole food,
+added sugar and salt come from ingredient categories, because no macro distinguishes a
+lentil from a lozenge. **Fat needs both**: the category says what kind of fat it is
+(`SATURATED_SHARE` in `context.ts` — butter and olive oil are both essentially pure fat
+and belong at opposite ends), and the ingredient's own `fat_100g` says how much of it
+there is. Judging fat by category membership alone scored a light mozzarella exactly
+like a mascarpone, and cost a dish sixteen points for containing any cheese at all.
 
 **Volume Score** (`src/lib/scoring/volume.ts`) blends 65% physical bulk (grams per
 serving, calorie density, water-rich composition) with 35% satiety support (protein,
@@ -117,13 +132,33 @@ The recipe on screen is resolved from the collection, not from the candidate lis
 Excluding an ingredient must never yank the plate out from under you — only the
 mechanism changes what is displayed.
 
-### Importing
+### Importing and editing
 
 Paste → parse → review → resolve → save. The parser handles what people actually
 paste: unicode fractions, `1 1/2`, ranges, bullets, `Serves 4`, section headings.
 Matching is trigram + token similarity against canonical names and aliases; anything
 below the confidence threshold comes back as a question with three honest answers —
 use it, search for the right one, or create it. Nothing uncertain is silently accepted.
+
+A matched row takes the ingredient's **canonical name**, so "sourdough", "sourdough
+bread" and "bread, sourdough" all settle on the same words and the collection reads
+as one voice. Keeping your own wording is a checkbox on the row, not the default: the
+nutrition stays attached either way.
+
+A row folds down to a summary line as soon as it has its answer — most of a parsed
+recipe is settled on arrival, and leaving fifteen open cards buried the two that
+still needed reading.
+
+Marking a row **swappable** opens an empty row attached beneath it for the
+alternative; mark *that* one swappable and the chain carries on. A stand-in carries
+its own quantity — 80 g halloumi *or* 120 g firm tofu — and falls back to the line it
+replaces when it has none. A chain is stored as `substitutions` on the line it hangs
+off, which is what keeps the nutrition honest: a dish made with chicken *or* tofu is
+costed once, never twice. In Explore the chain leads with the recipe's own first
+option, unless one of them is something you said you wanted, which moves to the front.
+
+The same editor backs `/add` and `/recipe/[id]/edit`. Editing carries the photo,
+image prompt, favourite mark and tags through untouched.
 
 ### Images
 
@@ -158,7 +193,9 @@ end — the veil buys back the contrast without flattening the colour. Deep vari
 
 Dotted numerals are traced from real numeral strokes rather than lit from a 5×7
 matrix (`src/lib/dotted/glyphs.ts`), sampled with pure maths so server and client
-agree exactly.
+agree exactly. Strokes are sampled one at a time, so every glyph is walked once more
+afterwards to drop dots that land on a neighbour — without it the waist of an 8 and
+the tail of a 6 read as blots rather than as line.
 
 Motion is a device changing state, not pages fading. Four named springs in
 `src/lib/motion.ts` and a 300–650 ms budget. Changing recipes runs a frosted plate

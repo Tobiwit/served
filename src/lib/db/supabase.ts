@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Ingredient, NewIngredient, NewRecipe, Recipe, RecipeIngredient } from './types';
+import { normalizeCourse } from './types';
 import { newId, type Repo } from './adapter';
 
 /**
@@ -67,6 +68,9 @@ export class SupabaseRepo implements Repo {
           recipe_ingredient_id: rows[i].id,
           substitute_ingredient_id: s.substitute_ingredient_id,
           display_name: s.display_name,
+          amount: s.amount,
+          unit: s.unit,
+          grams: s.grams,
           amount_multiplier: s.amount_multiplier,
           notes: s.notes,
         })),
@@ -163,6 +167,9 @@ function mapRecipe(row: any): Recipe {
         id: s.id,
         substitute_ingredient_id: s.substitute_ingredient_id,
         display_name: s.display_name,
+        amount: s.amount ?? null,
+        unit: s.unit ?? null,
+        grams: s.grams ?? null,
         amount_multiplier: s.amount_multiplier,
         notes: s.notes,
       })),
@@ -170,6 +177,8 @@ function mapRecipe(row: any): Recipe {
 
   return {
     ...row,
+    // rows written before 0002 ran still say lunch or dinner
+    course_type: normalizeCourse(row.course_type),
     ingredients,
     instructions: (row.recipe_instructions ?? []).slice().sort((a: any, b: any) => a.step_number - b.step_number),
     tags: (row.recipe_tags ?? []).map((t: any) => t.tags?.name).filter(Boolean),

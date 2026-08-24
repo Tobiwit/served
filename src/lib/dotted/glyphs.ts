@@ -37,7 +37,7 @@ const GLYPHS: Record<string, Stroke[]> = {
   '5': [L(8.6, 1.2, 3.2, 1.2), L(3.2, 1.2, 3.0, 6.5), A(5.2, 10.5, 4, 4.3, 250, 510)],
   '6': [A(5.6, 8.6, 4.4, 7.4, 290, 180), A(5.2, 10.9, 3.9, 4.1, 0, 360)],
   '7': [L(1.1, 1.3, 9, 1.3), L(9, 1.3, 3.5, 15)],
-  '8': [A(5, 4.5, 3.5, 3.5, 0, 360), A(5, 11.3, 4.1, 4, 0, 360)],
+  '8': [A(5, 4.5, 3.2, 3.5, 0, 360), A(5, 11.5, 3.9, 3.5, 0, 360)],
   '9': [A(5, 5.4, 3.9, 4.1, 0, 360), A(4.6, 7.6, 4.3, 7.4, 110, 0)],
   '.': [{ k: 'dot', x: 5, y: 14.4 }],
   ',': [{ k: 'dot', x: 5, y: 14.4 }],
@@ -116,6 +116,35 @@ function sampleArc(s: Extract<Stroke, { k: 'arc' }>, spacing: number): Dot[] {
   return out;
 }
 
+/**
+ * Strokes are sampled one at a time, so wherever two of them meet — the waist of an
+ * 8, the tail of a 6 joining its bowl, the crossbar of a + — each contributes its
+ * own dot to the same spot and the junction reads as a blot. Walk the glyph once and
+ * drop any dot that lands inside a neighbour's spacing.
+ *
+ * The threshold is deliberately under half a step: dots that legitimately sit a full
+ * interval apart survive, dots that are really one point counted twice do not.
+ */
+const MERGE = 0.72;
+
+function merge(dots: Dot[], spacing: number): Dot[] {
+  const min2 = (spacing * MERGE) ** 2;
+  const out: Dot[] = [];
+  for (const d of dots) {
+    let clash = false;
+    for (const kept of out) {
+      const dx = kept.x - d.x;
+      const dy = kept.y - d.y;
+      if (dx * dx + dy * dy < min2) {
+        clash = true;
+        break;
+      }
+    }
+    if (!clash) out.push(d);
+  }
+  return out;
+}
+
 /** Dots for a single character, in the 10x16 glyph box. */
 export function glyphDots(ch: string, spacing = 1.9): Dot[] {
   const strokes = GLYPHS[ch];
@@ -126,7 +155,7 @@ export function glyphDots(ch: string, spacing = 1.9): Dot[] {
     else if (s.k === 'line') out.push(...sampleLine(s, spacing));
     else out.push(...sampleArc(s, spacing));
   }
-  return out;
+  return merge(out, spacing);
 }
 
 const NARROW: Record<string, number> = { '.': 0.42, ',': 0.42, ':': 0.42, '1': 0.72, '-': 0.7, '−': 0.7 };

@@ -11,6 +11,13 @@ import { searchName } from '@/seed/build';
  * Calories lead because they are the value that makes the rest of the app work.
  * Every other macro is genuinely optional — left blank it stays unknown, and the
  * recipe still saves.
+ *
+ * Laid out for a phone with the keyboard up, which is the only way it is ever used:
+ * every field is 16px so iOS does not zoom the page the moment one is focused (that
+ * zoom was what pushed the form off the side of the screen), the twenty-one
+ * categories wrap instead of hiding in a horizontal scroller inside a vertical one,
+ * and the two actions ride a sticky bar so they are reachable without scrolling back
+ * past the fields you just filled in.
  */
 export function NewIngredientForm({
   initialName,
@@ -53,7 +60,7 @@ export function NewIngredientForm({
   };
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
+    <div style={{ display: 'grid', gap: 14 }}>
       <Labelled label="Name">
         <input
           value={name}
@@ -65,7 +72,7 @@ export function NewIngredientForm({
       </Labelled>
 
       <Labelled label="Category" hint="Used by the Health and Volume scores">
-        <div className="hstrip no-scrollbar" style={{ margin: 0, padding: 0 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {INGREDIENT_CATEGORIES.map((c) => (
             <button
               key={c}
@@ -74,13 +81,13 @@ export function NewIngredientForm({
               aria-pressed={category === c}
               className="t-micro"
               style={{
-                flex: '0 0 auto',
-                padding: '7px 12px',
+                padding: '8px 12px',
                 borderRadius: 'var(--r-pill)',
                 whiteSpace: 'nowrap',
+                fontSize: 11.5,
                 background: category === c ? 'var(--ink)' : 'var(--paper)',
                 color: category === c ? '#fff' : 'var(--ink-45)',
-                boxShadow: 'var(--lift-1)',
+                boxShadow: category === c ? 'none' : 'inset 0 0 0 1px var(--ink-08)',
               }}
             >
               {CATEGORY_LABEL[c]}
@@ -89,48 +96,67 @@ export function NewIngredientForm({
         </div>
       </Labelled>
 
-      <div className="surface hairline" style={{ borderRadius: 'var(--r-lg)', padding: 16 }}>
-        <div className="t-label t-dim-2" style={{ marginBottom: 12 }}>
+      <div className="surface hairline" style={{ borderRadius: 'var(--r-lg)', padding: 14 }}>
+        <div className="t-label t-dim-2" style={{ marginBottom: 10 }}>
           Per 100 g
         </div>
 
-        <Labelled label="Calories">
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <input
-              value={kcal}
-              onChange={(e) => setKcal(e.target.value)}
-              inputMode="decimal"
-              placeholder="0"
-              aria-label="Calories per 100g"
-              style={{ ...inputStyle, fontSize: 26, fontWeight: 200, padding: '4px 0', border: 'none', borderBottom: '1px solid var(--ink-08)' }}
-            />
-            <span className="t-micro t-dim">kcal</span>
-          </div>
-        </Labelled>
+        <label style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <input
+            value={kcal}
+            onChange={(e) => setKcal(e.target.value)}
+            inputMode="decimal"
+            placeholder="0"
+            aria-label="Calories per 100g"
+            style={{
+              ...inputStyle,
+              minWidth: 0,
+              fontSize: 26,
+              fontWeight: 200,
+              padding: '4px 0',
+              borderRadius: 0,
+              border: 'none',
+              borderBottom: '1px solid var(--ink-08)',
+            }}
+          />
+          <span className="t-micro t-dim" style={{ flex: '0 0 auto' }}>
+            kcal
+          </span>
+        </label>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
           <Small label="Protein" value={protein} onChange={setProtein} />
           <Small label="Carbs" value={carbs} onChange={setCarbs} />
           <Small label="Fat" value={fat} onChange={setFat} />
           <Small label="Fibre" value={fiber} onChange={setFiber} />
         </div>
 
-        <p className="t-micro t-dim-2" style={{ margin: '14px 0 0', lineHeight: 1.5 }}>
+        <p className="t-micro t-dim-2" style={{ margin: '12px 0 0', lineHeight: 1.5 }}>
           Leave anything you do not know blank. Blank stays unknown — it is never counted as zero.
         </p>
       </div>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-        <input type="checkbox" checked={basic} onChange={(e) => setBasic(e.target.checked)} />
+        <input type="checkbox" checked={basic} onChange={(e) => setBasic(e.target.checked)} style={{ width: 17, height: 17 }} />
         <span className="t-micro t-dim">Pantry basic — hide from Explore ingredient bubbles</span>
       </label>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+      {/* sticky, so the way out of the form is never below the fold */}
+      <div
+        style={{
+          position: 'sticky',
+          bottom: -1,
+          display: 'flex',
+          gap: 8,
+          padding: '10px 0 2px',
+          background: 'linear-gradient(180deg, rgba(236,236,237,0) 0%, var(--fog) 22%)',
+        }}
+      >
         <button
           type="button"
           onClick={onSkip}
           className="surface hairline"
-          style={{ flex: '0 0 auto', padding: '13px 18px', borderRadius: 'var(--r-pill)', fontSize: 14, fontWeight: 300, color: 'var(--ink-45)' }}
+          style={{ flex: '0 0 auto', padding: '13px 16px', borderRadius: 'var(--r-pill)', fontSize: 14, fontWeight: 300, color: 'var(--ink-45)' }}
         >
           Skip nutrition
         </button>
@@ -163,7 +189,8 @@ const inputStyle: React.CSSProperties = {
   border: '1px solid var(--ink-08)',
   outline: 'none',
   background: 'var(--paper)',
-  fontSize: 14.5,
+  // 16px is the threshold below which mobile Safari zooms the page on focus
+  fontSize: 16,
   fontWeight: 300,
 };
 
@@ -181,7 +208,7 @@ function Labelled({ label, hint, children }: { label: string; hint?: string; chi
 
 function Small({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
-    <label style={{ display: 'block' }}>
+    <label style={{ display: 'block', minWidth: 0 }}>
       <span className="t-micro t-dim-2" style={{ display: 'block', marginBottom: 4, fontSize: 11 }}>
         {label}
       </span>
@@ -192,9 +219,11 @@ function Small({ label, value, onChange }: { label: string; value: string; onCha
           inputMode="decimal"
           placeholder="—"
           aria-label={`${label} per 100g`}
-          style={{ ...inputStyle, padding: '7px 10px', fontSize: 14 }}
+          style={{ ...inputStyle, minWidth: 0, padding: '8px 10px' }}
         />
-        <span className="t-micro t-dim-2">g</span>
+        <span className="t-micro t-dim-2" style={{ flex: '0 0 auto' }}>
+          g
+        </span>
       </div>
     </label>
   );

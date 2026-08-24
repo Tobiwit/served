@@ -1,4 +1,5 @@
 import type { Ingredient, NewIngredient, NewRecipe, Recipe } from './types';
+import { normalizeCourse } from './types';
 import { newId, type Repo } from './adapter';
 import { SEED_INGREDIENTS, SEED_RECIPES } from '@/seed';
 
@@ -40,7 +41,8 @@ export class LocalRepo implements Repo {
   readonly kind = 'local' as const;
 
   async listRecipes(): Promise<Recipe[]> {
-    return read(KEY_R, SEED_RECIPES);
+    // recipes saved before lunch and dinner merged still carry the old course tag
+    return read(KEY_R, SEED_RECIPES).map((r) => ({ ...r, course_type: normalizeCourse(r.course_type) }));
   }
 
   async saveRecipe(recipe: NewRecipe): Promise<Recipe> {

@@ -110,6 +110,10 @@ export function buildRecipe(seed: RecipeSeed, createdOffsetDays: number): Recipe
         id: `${id}_ri${i}_s${j}`,
         substitute_ingredient_id: `ing_${slugify(s)}`,
         display_name: s,
+        // the starter collection swaps like for like; null means "same as the line"
+        amount: null,
+        unit: null,
+        grams: null,
         amount_multiplier: null,
         notes: null,
       })),

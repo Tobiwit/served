@@ -69,7 +69,18 @@ export function IngredientLines({
                       {ri.notes && <span className="t-micro t-dim-2">{`, ${ri.notes}`}</span>}
                       {ri.substitutions.length > 0 && (
                         <span className="t-micro t-dim-2" style={{ display: 'block', marginTop: 2 }}>
-                          or {ri.substitutions.map((s) => s.display_name).join(', ')}
+                          or{' '}
+                          {ri.substitutions
+                            .map((s) => {
+                              // a stand-in only states an amount when it differs from
+                              // the line it replaces; otherwise it is the same measure
+                              const own = formatAmount(
+                                s.amount == null ? null : Math.round(s.amount * scale * 100) / 100,
+                                s.unit,
+                              );
+                              return own ? `${own} ${s.display_name}` : s.display_name;
+                            })
+                            .join(', ')}
                         </span>
                       )}
                     </span>

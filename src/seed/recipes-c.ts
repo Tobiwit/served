@@ -8,7 +8,7 @@ export const SEEDS_C: RecipeSeed[] = [
     prep: 10,
     cook: 10,
     cuisine: 'Korean',
-    course: 'dinner',
+    course: 'main',
     tags: ['high protein', 'high volume'],
     subs: { 'Turkey mince': ['Lean beef mince', 'Firm tofu'], Gochujang: ['Harissa'] },
     ing: [
@@ -37,7 +37,7 @@ export const SEEDS_C: RecipeSeed[] = [
     prep: 10,
     cook: 15,
     cuisine: 'Italian',
-    course: 'dinner',
+    course: 'main',
     tags: ['vegetarian'],
     subs: { Ricotta: ['Cottage cheese'], 'Wholewheat pasta, cooked': ['Pasta, cooked'] },
     ing: [
@@ -93,7 +93,7 @@ export const SEEDS_C: RecipeSeed[] = [
     prep: 5,
     cook: 15,
     cuisine: 'Korean',
-    course: 'dinner',
+    course: 'main',
     tags: ['high protein', 'quick'],
     subs: { 'White rice, cooked': ['Brown rice, cooked'], Prawns: ['Firm tofu', 'Chicken breast'] },
     ing: [
@@ -122,7 +122,7 @@ export const SEEDS_C: RecipeSeed[] = [
     prep: 15,
     cook: 0,
     cuisine: 'Mediterranean',
-    course: 'lunch',
+    course: 'main',
     tags: ['no cook', 'meal prep'],
     subs: { Feta: ['Cottage cheese'], 'Quinoa, cooked': ['Couscous, cooked'] },
     ing: [
@@ -151,7 +151,7 @@ export const SEEDS_C: RecipeSeed[] = [
     prep: 10,
     cook: 10,
     cuisine: 'Japanese',
-    course: 'dinner',
+    course: 'main',
     tags: ['high volume', 'vegetarian'],
     subs: { 'Firm tofu': ['Egg'] },
     ing: [

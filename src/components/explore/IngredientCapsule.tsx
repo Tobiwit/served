@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { settleDelay, spring } from '@/lib/motion';
 
@@ -225,17 +225,40 @@ function SwapGlyph({ color }: { color: string }) {
 /**
  * Prioritised marker.
  *
- * A pulse radiating out from the pill, drawn in the same fine dotted linework as the
- * launch ripple and the plate aperture. One ring holds steady so the pill stays
- * marked at rest; three more light and fade outward in sequence, which reads as
- * radiance without drawing a single heavy stroke.
+ * Two rows of dots around the pill, drawn in the same fine dotted linework as the
+ * launch ripple and the plate aperture. The inner row hugs the outline and holds
+ * steady, so a wanted ingredient is marked at rest. The outer row is fainter, sits a
+ * little further out, and is phase-shifted half a dot so it never lines up with the
+ * inner one — the same offset-and-drift the rings under the Explore button use.
  *
- * The rings are fixed geometry and only their opacity animates — no path is
- * regenerated, nothing is scaled, so the corners never distort.
+ * Both rows crawl, slowly and in opposite directions, by animating the dash offset
+ * rather than rotating: these are stadium outlines, not circles, and spinning one
+ * would smear it through the corners. Advancing the offset by exactly one dash period
+ * loops seamlessly whatever the pill's perimeter turns out to be.
+ *
+ * The dots are drawn in the boost tone rather than white. White on frosted white was
+ * the whole problem: at rest the marker was almost invisible, and a pulse leaving the
+ * pill could only be seen if you already knew to look for it. Rose through coral
+ * carries against pale glass, and it is the colour the boost field uses everywhere
+ * else, so a wanted ingredient reads as wanted.
  */
+
+/**
+ * How far each row stands off the pill. Everything else about them — the dash
+ * pattern, the phase offset, the drift, the weight, the fade — lives in
+ * `.boost-row*` in globals.css, next to the keyframes it has to stay in step with.
+ */
+const ROWS = [
+  { out: 2.5, className: 'boost-row boost-row-inner' },
+  { out: 7.5, className: 'boost-row boost-row-outer' },
+];
+
 function BoostOrbit() {
   const [box, setBox] = useState({ w: 0, h: 0 });
   const host = useRef<HTMLSpanElement | null>(null);
+  // useId, not a module counter: the gradient is referenced by url() and the id has
+  // to be identical on the server and after hydration
+  const gid = `boost-${useId().replace(/:/g, '')}`;
 
   useLayoutEffect(() => {
     const node = host.current;
@@ -250,38 +273,31 @@ function BoostOrbit() {
     return () => ro.disconnect();
   }, []);
 
-  const rings = useMemo(() => {
+  const rows = useMemo(() => {
     if (box.w <= 0 || box.h <= 0) return [];
-    return RINGS.map((r) => ({
-      ...r,
-      d: stadiumPath(box.w + r.out * 2, box.h + r.out * 2),
-    }));
+    return ROWS.map((r) => ({ ...r, d: stadiumPath(box.w + r.out * 2, box.h + r.out * 2) }));
   }, [box]);
 
   return (
     <span ref={host} aria-hidden style={{ position: 'absolute', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
-      {rings.length > 0 && (
+      {rows.length > 0 && (
         <svg width={box.w} height={box.h} style={{ position: 'absolute', inset: 0, overflow: 'visible' }}>
-          {rings.map((r, i) => (
-            <motion.path
+          <defs>
+            {/* rose at the top, coral at the foot — the boost field, drawn as dots */}
+            <linearGradient id={gid} x1="0" y1="0" x2="0.35" y2="1">
+              <stop offset="0%" stopColor="#ff9dc0" />
+              <stop offset="52%" stopColor="#ef5f8c" />
+              <stop offset="100%" stopColor="#e8683f" />
+            </linearGradient>
+          </defs>
+          {rows.map((r, i) => (
+            <path
               key={i}
+              className={r.className}
               d={r.d}
               transform={`translate(${-r.out} ${-r.out})`}
               fill="none"
-              stroke="#ffffff"
-              strokeWidth={1.7}
-              // a zero-length dash with a round cap draws a true dot rather than a
-              // short line; the shadow gives it definition against pale glass
-              strokeDasharray="0.01 5.4"
-              strokeLinecap="round"
-              style={{ filter: 'drop-shadow(0 0.5px 0.9px rgba(14,15,17,0.42))' }}
-              initial={false}
-              animate={r.hold ? { opacity: 0.95 } : { opacity: [0, 0.8, 0] }}
-              transition={
-                r.hold
-                  ? { duration: 0.4 }
-                  : { duration: 2.6, times: [0, 0.35, 1], repeat: Infinity, ease: 'easeOut', delay: r.delay }
-              }
+              stroke={`url(#${gid})`}
             />
           ))}
         </svg>
@@ -301,11 +317,3 @@ function stadiumPath(w: number, h: number): string {
   const right = Math.max(r, w - r);
   return `M ${r} 0 H ${right} A ${r} ${r} 0 0 1 ${right} ${h} H ${r} A ${r} ${r} 0 0 1 ${r} 0 Z`;
 }
-
-/** the steady marker, then three pulses leaving in sequence */
-const RINGS = [
-  { out: 2.5, hold: true, delay: 0 },
-  { out: 6, hold: false, delay: 0 },
-  { out: 10, hold: false, delay: 0.32 },
-  { out: 14.5, hold: false, delay: 0.64 },
-];

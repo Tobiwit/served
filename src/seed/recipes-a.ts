@@ -8,7 +8,7 @@ export const SEEDS_A: RecipeSeed[] = [
     prep: 10,
     cook: 10,
     cuisine: 'Other',
-    course: 'lunch',
+    course: 'main',
     tags: ['quick'],
     subs: { Parmesan: ['Nutritional yeast'], 'Protein tortilla': ['Wholewheat tortilla'] },
     ing: [
@@ -39,7 +39,7 @@ export const SEEDS_A: RecipeSeed[] = [
     prep: 10,
     cook: 20,
     cuisine: 'Mediterranean',
-    course: 'dinner',
+    course: 'main',
     tags: ['high volume', 'vegetarian'],
     subs: { 'Quinoa, cooked': ['Brown rice, cooked', 'Couscous, cooked'], Tahini: ['Greek yogurt 0%'] },
     ing: [
@@ -70,7 +70,7 @@ export const SEEDS_A: RecipeSeed[] = [
     prep: 10,
     cook: 15,
     cuisine: 'Korean',
-    course: 'dinner',
+    course: 'main',
     tags: ['high protein'],
     subs: { 'Brown rice, cooked': ['White rice, cooked'] },
     ing: [
@@ -130,7 +130,7 @@ export const SEEDS_A: RecipeSeed[] = [
     prep: 15,
     cook: 0,
     cuisine: 'Japanese',
-    course: 'lunch',
+    course: 'main',
     tags: ['quick', 'no cook'],
     subs: { 'Udon noodles, cooked': ['Wholewheat pasta, cooked'] },
     ing: [
@@ -160,7 +160,7 @@ export const SEEDS_A: RecipeSeed[] = [
     prep: 10,
     cook: 25,
     cuisine: 'Indian',
-    course: 'dinner',
+    course: 'main',
     tags: ['high volume', 'batch', 'vegetarian'],
     subs: { 'Light coconut milk': ['Soy milk'] },
     ing: [

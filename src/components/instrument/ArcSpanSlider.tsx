@@ -8,10 +8,15 @@ import { spring } from '@/lib/motion';
 /**
  * Arc span slider.
  *
- * A lime anchor sits at the left of a dotted baseline. Dragging the white travelling
- * dot along the baseline stretches a family of nested arcs that spring from the
- * anchor — the further you pull, the taller and wider the arch. The value is the
- * span, so the setting is legible as a *shape* before you read the number.
+ * The whole family of arches is the scale: a fixed set of faint arcs springing from
+ * the lime anchor at the left, each one a step further out and a step taller, drawn
+ * once and never moved. You drag a single lit arch through them. It grows exactly the
+ * way the background does, so the reading is a shape measured against a printed
+ * scale, not a dot on a line — and how much food you asked for is legible before you
+ * read the number.
+ *
+ * The arches used to be the *value* — three nested curves that stretched as you
+ * pulled — which left nothing on the card to measure them against.
  */
 
 type Props = {
@@ -29,8 +34,9 @@ type Props = {
 
 const PAD_L = 12;
 const PAD_R = 14;
-const BASE_FROM_BOTTOM = 22;
-const DOTS = 11;
+const BASE_FROM_BOTTOM = 15;
+/** how many arches the scale is printed with */
+const RUNGS = 7;
 
 export function ArcSpanSlider({
   min,
@@ -71,32 +77,31 @@ export function ArcSpanSlider({
     [max, min, step, onChange],
   );
 
-  // three nested arcs: the outer one spans to the dot, the inner two fall short,
-  // which is what gives the reference its layered "spring" look
-  const arcs = useMemo(() => {
-    const span = Math.max(2, cx - x0);
-    return [1, 0.72, 0.46].map((k) => {
-      const end = x0 + span * k;
-      const rx = span * k * 0.5;
-      // flattened, and capped by the headroom above the baseline so the family
-      // never rides out of the card
-      const ry = Math.min(baseY - 6, Math.max(3, span * k * 0.3));
-      return { d: `M ${x0} ${baseY} A ${rx} ${ry} 0 0 1 ${end} ${baseY}`, k };
-    });
-  }, [cx, x0, baseY]);
-
-  const dots = useMemo(
-    () =>
-      Array.from({ length: DOTS }, (_, i) => {
-        const p = i / (DOTS - 1);
-        return { x: x0 + (x1 - x0) * p, p };
-      }),
-    [x0, x1],
+  /**
+   * One arch, as a fraction of the track. Width and height both grow with the
+   * fraction, so the lit arch and the printed ones are the same curve at different
+   * settings — that is what makes the scale readable.
+   */
+  const arch = useCallback(
+    (k: number) => {
+      const span = Math.max(1.5, (x1 - x0) * k);
+      const rx = span / 2;
+      const ry = 3 + (baseY - 8) * k;
+      return `M ${round(x0)} ${round(baseY)} A ${round(rx)} ${round(ry)} 0 0 1 ${round(x0 + span)} ${round(baseY)}`;
+    },
+    [x0, x1, baseY],
   );
 
-  const stroke = active ? 'rgba(255,255,255,0.9)' : 'rgba(14,15,17,0.28)';
-  const dotDim = active ? 'rgba(255,255,255,0.42)' : 'rgba(14,15,17,0.16)';
-  const dotLit = active ? '#ffffff' : 'rgba(14,15,17,0.5)';
+  const rungs = useMemo(
+    () => (width > 0 ? Array.from({ length: RUNGS }, (_, i) => arch((i + 1) / RUNGS)) : []),
+    [arch, width],
+  );
+
+  const lit = arch(Math.max(0.02, t));
+
+  const rungCol = active ? 'rgba(255,255,255,0.3)' : 'rgba(14,15,17,0.12)';
+  const litCol = active ? '#ffffff' : 'rgba(14,15,17,0.55)';
+  const baseCol = active ? 'rgba(255,255,255,0.4)' : 'rgba(14,15,17,0.16)';
   const textCol = active ? 'rgba(255,255,255,0.68)' : 'rgba(14,15,17,0.32)';
 
   return (
@@ -140,38 +145,30 @@ export function ArcSpanSlider({
     >
       {width > 0 && (
         <svg width={width} height={height} style={{ display: 'block', overflow: 'visible' }}>
-          {arcs.map((a, i) => (
-            <motion.path
-              key={i}
-              d={a.d}
-              fill="none"
-              stroke={stroke}
-              strokeWidth={i === 0 ? 1 : 0.8}
-              strokeLinecap="round"
-              style={{ opacity: 1 - i * 0.22 }}
-              initial={false}
-              animate={{ d: a.d }}
-              transition={spring.dial}
-            />
+          {/* the printed scale */}
+          {rungs.map((d, i) => (
+            <path key={i} d={d} fill="none" stroke={rungCol} strokeWidth={0.8} strokeLinecap="round" />
           ))}
 
-          {dots.map((d, i) => {
-            const lit = d.p <= t + 0.001;
-            return (
-              <circle
-                key={i}
-                cx={d.x}
-                cy={baseY}
-                r={lit ? 2.6 : 1.6}
-                fill={lit ? dotLit : dotDim}
-                style={{ transition: 'fill 200ms linear, r 200ms linear' }}
-              />
-            );
-          })}
+          <line x1={x0} x2={x1} y1={baseY} y2={baseY} stroke={baseCol} strokeWidth={1} strokeLinecap="round" />
 
-          {/* the anchor the arcs spring from */}
-          <circle cx={x0} cy={baseY} r={5.2} fill={active ? '#d9f265' : 'rgba(14,15,17,0.34)'} />
+          {/* the one arch you drag */}
+          <motion.path
+            initial={false}
+            animate={{ d: lit }}
+            transition={spring.dial}
+            d={lit}
+            fill="none"
+            stroke={litCol}
+            strokeWidth={1.8}
+            strokeLinecap="round"
+            style={active ? { filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.5))' } : undefined}
+          />
 
+          {/* the anchor it springs from */}
+          <circle cx={x0} cy={baseY} r={4.4} fill={active ? '#d9f265' : 'rgba(14,15,17,0.34)'} />
+
+          {/* the handle rides the far foot of the arch */}
           <motion.circle
             initial={false}
             animate={{ cx }}
@@ -182,19 +179,19 @@ export function ArcSpanSlider({
             style={active ? { filter: 'drop-shadow(0 0 5px rgba(255,255,255,0.65))' } : undefined}
           />
 
-          {ticks.map((label, i) => {
+          {ticks.map((caption, i) => {
             const p = ticks.length === 1 ? 0 : i / (ticks.length - 1);
             return (
               <text
-                key={label}
+                key={caption}
                 x={x0 + (x1 - x0) * p}
-                y={height - 5}
+                y={height - 3}
                 textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}
                 fill={textCol}
-                fontSize={9}
+                fontSize={8.5}
                 letterSpacing="0.04em"
               >
-                {label}
+                {caption}
               </text>
             );
           })}
@@ -203,3 +200,5 @@ export function ArcSpanSlider({
     </div>
   );
 }
+
+const round = (v: number) => Math.round(v * 100) / 100;
