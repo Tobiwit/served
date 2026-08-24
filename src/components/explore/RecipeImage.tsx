@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { GradientField, type Tone } from '@/components/glass/GradientField';
+import { useImageSrc } from '@/lib/hooks/useImageSrc';
 import type { Recipe } from '@/lib/db/types';
 
 /**
@@ -42,11 +43,14 @@ export const RecipeImage = memo(function RecipeImage({
   radius?: string;
   showAperture?: boolean;
 }) {
-  if (recipe.image_url) {
+  // a photo added offline is a blob in the mirror, not a URL, until the queue drains
+  const src = useImageSrc(recipe.image_url);
+
+  if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={recipe.image_url}
+        src={src}
         alt={recipe.title}
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: radius }}
       />

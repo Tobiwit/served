@@ -1,4 +1,4 @@
-import { supabaseClient } from '@/lib/db/supabase';
+import { getRepo } from '@/lib/db';
 
 /**
  * Recipe photography.
@@ -6,12 +6,10 @@ import { supabaseClient } from '@/lib/db/supabase';
  * The app does not generate images — it generates a prompt. This is the other half
  * of that loop: bring the resulting photo back in.
  *
- * Images are downscaled and re-encoded before they are stored. On the local store
- * they become data URLs living in localStorage, which has a hard quota measured in
- * single-digit megabytes, so the size ceiling here is not cosmetic.
+ * Images are downscaled and re-encoded before they leave here. The ceiling is not
+ * cosmetic: a photo taken with no signal waits in the device mirror until the queue
+ * drains, and a phone's storage budget is not a place to park 4 MB camera output.
  */
-
-export const BUCKET = 'recipe-images';
 
 const MAX_EDGE = 1100;
 const TARGET_BYTES = 320 * 1024;
@@ -46,7 +44,7 @@ async function decode(file: File): Promise<ImageBitmap | HTMLImageElement> {
 }
 
 /** Downscale, square-ish crop preserved, re-encode as JPEG under the size ceiling. */
-export async function compressImage(file: File): Promise<{ blob: Blob; dataUrl: string }> {
+export async function compressImage(file: File): Promise<Blob> {
   const source = await decode(file);
   const w = 'width' in source ? source.width : 0;
   const h = 'height' in source ? source.height : 0;
@@ -64,49 +62,24 @@ export async function compressImage(file: File): Promise<{ blob: Blob; dataUrl: 
     const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
     if (!blob) continue;
     if (blob.size <= TARGET_BYTES || quality === QUALITY_STEPS[QUALITY_STEPS.length - 1]) {
-      return { blob, dataUrl: await blobToDataUrl(blob) };
+      return blob;
     }
   }
   throw new ImageTooLargeError();
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error('Could not encode that image.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 /**
  * Store a recipe photo and return the URL to save on the recipe.
- * Supabase Storage when configured, an inline data URL otherwise.
+ *
+ * With a connection that is a public Storage URL. Without one it is an `idb:`
+ * sentinel backed by the blob sitting in the outbox, which the flush replaces with
+ * the real URL later. The caller cannot tell the difference and does not need to.
  */
 export async function storeRecipeImage(recipeId: string, file: File): Promise<string> {
-  const { blob, dataUrl } = await compressImage(file);
-
-  const db = supabaseClient();
-  if (!db) return dataUrl;
-
-  const path = `${recipeId}-${Date.now()}.jpg`;
-  const { error } = await db.storage.from(BUCKET).upload(path, blob, {
-    contentType: 'image/jpeg',
-    upsert: true,
-  });
-  if (error) throw error;
-
-  const { data } = db.storage.from(BUCKET).getPublicUrl(path);
-  return data.publicUrl;
+  return getRepo().storeImage(recipeId, await compressImage(file));
 }
 
 /** Best-effort cleanup; a missing remote object is not an error worth surfacing. */
 export async function removeRecipeImage(imageUrl: string | null): Promise<void> {
-  if (!imageUrl || imageUrl.startsWith('data:')) return;
-  const db = supabaseClient();
-  if (!db) return;
-  const marker = `/${BUCKET}/`;
-  const i = imageUrl.indexOf(marker);
-  if (i === -1) return;
-  await db.storage.from(BUCKET).remove([imageUrl.slice(i + marker.length)]);
+  return getRepo().removeImage(imageUrl);
 }

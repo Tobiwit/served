@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
+import { useAuth } from '@/lib/auth/AuthProvider';
 import { HEALTH_CONFIG, VOLUME_CONFIG } from '@/lib/scoring';
 
 export default function SettingsPage() {
-  const { recipes, ingredients, storageKind, resetToSeed } = useData();
+  const { recipes, ingredients, sync, syncNow, refreshFromCloud } = useData();
   const { reset } = useExplore();
+  const { email, signOut } = useAuth();
   const [standalone, setStandalone] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmRefresh, setConfirmRefresh] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const nav = window.navigator as Navigator & { standalone?: boolean };
@@ -28,7 +31,26 @@ export default function SettingsPage() {
       <Group title="Collection">
         <RowLink href="/ingredients" label="Ingredient database" value={`${ingredients.length} entries`} />
         <RowLink href="/library" label="Recipes" value={`${recipes.length} saved`} />
-        <Row label="Storage" value={storageKind === 'supabase' ? 'Supabase' : 'On this device'} />
+      </Group>
+
+      <Group title="Sync">
+        <button
+          type="button"
+          onClick={() => void syncNow()}
+          className="surface hairline"
+          style={{ ...rowStyle, width: '100%', textAlign: 'left' }}
+        >
+          <span className="t-body">{syncLabel(sync)}</span>
+          <span className="t-micro t-dim-2">{syncDetail(sync)}</span>
+        </button>
+
+        <div className="surface hairline" style={{ ...rowStyle, display: 'block' }}>
+          <p className="t-micro t-dim" style={{ margin: 0, lineHeight: 1.6 }}>
+            Recipes, ingredients and photos are kept in the database and mirrored onto this
+            device. Everything is readable and editable with no connection — changes queue here
+            and go up the next time there is one.
+          </p>
+        </div>
       </Group>
 
       <Group title="Explore">
@@ -70,36 +92,79 @@ export default function SettingsPage() {
         </div>
       </Group>
 
+      <Group title="Account">
+        <Row label="Signed in" value={email ?? '—'} />
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          disabled={sync.pending > 0}
+          className="surface hairline"
+          style={{ ...rowStyle, width: '100%', textAlign: 'left', opacity: sync.pending > 0 ? 0.45 : 1 }}
+        >
+          <span className="t-body">Sign out</span>
+          <span className="t-micro t-dim-2">
+            {sync.pending > 0
+              ? `${sync.pending} change${sync.pending === 1 ? '' : 's'} still to send — sync first`
+              : 'You will need the password again to get back in'}
+          </span>
+        </button>
+      </Group>
+
       <Group title="Data">
         <button
           type="button"
           onClick={async () => {
-            if (!confirmReset) {
-              setConfirmReset(true);
+            if (!confirmRefresh) {
+              setConfirmRefresh(true);
               return;
             }
-            await resetToSeed();
-            setConfirmReset(false);
+            setRefreshing(true);
+            await refreshFromCloud();
+            setRefreshing(false);
+            setConfirmRefresh(false);
           }}
-          disabled={storageKind === 'supabase'}
+          disabled={refreshing || sync.pending > 0}
           className="surface hairline"
-          style={{
-            ...rowStyle,
-            width: '100%',
-            textAlign: 'left',
-            opacity: storageKind === 'supabase' ? 0.45 : 1,
-          }}
+          style={{ ...rowStyle, width: '100%', textAlign: 'left', opacity: refreshing || sync.pending > 0 ? 0.45 : 1 }}
         >
-          <span className="t-body">{confirmReset ? 'Tap again to confirm' : 'Restore starter collection'}</span>
+          <span className="t-body">
+            {refreshing ? 'Refreshing…' : confirmRefresh ? 'Tap again to confirm' : 'Refresh from cloud'}
+          </span>
           <span className="t-micro t-dim-2">
-            {storageKind === 'supabase'
-              ? 'Only available on device storage'
-              : 'Replaces everything with the seeded recipes and ingredients'}
+            {sync.pending > 0
+              ? 'Not while there are unsent changes'
+              : 'Discards the copy on this device and downloads the collection again'}
           </span>
         </button>
       </Group>
     </main>
   );
+}
+
+function syncLabel(sync: { phase: string; pending: number; failed: number }): string {
+  if (sync.failed > 0) return `${sync.failed} change${sync.failed === 1 ? '' : 's'} could not be saved`;
+  if (sync.phase === 'syncing') return 'Syncing…';
+  if (sync.pending > 0) return `${sync.pending} change${sync.pending === 1 ? '' : 's'} waiting to send`;
+  if (sync.phase === 'offline') return 'Offline';
+  if (sync.phase === 'error') return 'Sync failed';
+  return 'Everything is synced';
+}
+
+function syncDetail(sync: { phase: string; lastSyncedAt: string | null; error: string | null }): string {
+  if (sync.phase === 'error' && sync.error) return sync.error;
+  if (sync.phase === 'offline') return 'Working from the copy on this device — tap to retry';
+  if (!sync.lastSyncedAt) return 'Not synced yet — tap to sync now';
+  return `Last synced ${relative(sync.lastSyncedAt)} — tap to sync now`;
+}
+
+function relative(iso: string): string {
+  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
 }
 
 const rowStyle: React.CSSProperties = {

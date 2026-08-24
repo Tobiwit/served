@@ -200,3 +200,24 @@ export interface Recipe {
 
 export type NewRecipe = Omit<Recipe, 'id' | 'created_at' | 'updated_at'> & { id?: string };
 export type NewIngredient = Omit<Ingredient, 'id' | 'created_at' | 'updated_at'> & { id?: string };
+
+/**
+ * Rotation history. One row each time a recipe was actually made — append-only, so
+ * "last cooked" is a max() and "how often" is a count, rather than two fields on the
+ * recipe that have to be kept honest.
+ */
+export interface CookLogEntry {
+  id: string;
+  recipe_id: string;
+  cooked_at: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** `cooked_at` defaults to now and a note is rarely wanted, so neither is required. */
+export type NewCookLogEntry = Omit<CookLogEntry, 'id' | 'created_at' | 'updated_at' | 'cooked_at' | 'note'> & {
+  id?: string;
+  cooked_at?: string;
+  note?: string | null;
+};

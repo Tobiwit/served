@@ -19,8 +19,9 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` on a phone-sized viewport. It ships with 18 recipes and
-137 ingredients so the app is usable the moment it starts.
+Open `http://localhost:3000` on a phone-sized viewport. The collection lives in
+Supabase, so set that up first — see **Storage** below. `npm run seed:cloud` puts the
+starter 18 recipes and 137 ingredients in an empty database.
 
 ### Installing to the iPhone Home Screen
 
@@ -33,21 +34,94 @@ in sync.
 
 ## Storage
 
-The app runs against a seeded local store by default. Add Supabase credentials and it
-switches over with no other changes:
+Local-first in behaviour, cloud-backed in persistence.
+
+The database is the source of truth for recipes, ingredients, nutrition,
+substitutions, favourites and cooked history. The device keeps a full mirror of it in
+IndexedDB, so **every read is answered locally and every write returns before it has
+been sent anywhere.** The app behaves the same with no signal as with one; only the
+sync readout in Settings can tell the difference.
+
+```
+UI ──► DataProvider ──► CloudRepo ──┬──► IndexedDB mirror  reads, always
+                                    ├──► outbox           writes, queued in order
+                                    └──► SupabaseRemote   flush + delta pull
+```
+
+Writes land in the mirror and in an outbox in the same tick. The queue drains to
+Supabase whenever there is a connection — on reconnect, on returning to the app, and
+on a timer while anything is unsent. It drains strictly in order and strictly
+serially, because two writes to one recipe arriving out of order would leave the
+cloud holding the older one. Repeat writes to the same record are folded together, so
+tapping favourite five times sends one row.
+
+A write Postgres rejects on its merits is parked rather than retried forever; one bad
+row must not wedge everything behind it. Settings says so when it happens.
+
+Conflicts resolve last-write-wins per record, which is the honest resolution for one
+person with one or two devices. The rule that matters: **a pulled row never overwrites
+a local edit that has not been sent yet.**
+
+Deletes are soft. A row that simply vanished is invisible to a delta pull — it reads
+as "not changed" — so deleting sets `deleted_at` and the mirror evicts what it sees
+carrying one.
+
+### What lives where
+
+| | |
+| --- | --- |
+| Recipes, ingredients, nutrition, substitutions | cloud + mirror |
+| Favourites, cooked history | cloud + mirror |
+| Photos | Supabase Storage, cached by the service worker |
+| Explore filters, popped ingredients, recipes seen this run | local only |
+| Last open screen | local only |
+
+An Explore run is deliberately disposable — it holds what you want *today* — so it
+was never a candidate for syncing. It stays in `localStorage` and resets on a new
+calendar day.
+
+### Offline
+
+`public/sw.js` holds the app shell and the build assets. Without it the mirror would
+be unreachable: a Home Screen PWA launched with no signal has no browser to fall back
+on, and every cached recipe would sit behind a white screen. Recipe photos are cached
+too — their paths carry a timestamp, so they are immutable. Supabase REST and auth are
+never cached; a stale row or a stale token is worse than an honest failure, and the
+app is built to survive that failure.
+
+A photo added offline is compressed, parked in the mirror as a blob, and shown from an
+`idb:` sentinel until the queue drains and rewrites it to the real URL.
+
+### The account
+
+One private account, met once. Email and password rather than a magic link,
+deliberately: a link opens in Safari, and a Home Screen PWA on iOS keeps its own
+storage — the session would land in the browser and never reach the installed app.
+Supabase rotates the refresh token from then on.
+
+### Setting it up
+
+**[SETUP.md](SETUP.md) walks the whole thing** — creating the project, running the
+migrations, the account, the seed, Vercel, and installing to the Home Screen.
+
+The short version:
 
 ```bash
 cp .env.example .env.local
 ```
 
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+1. Apply the migrations in `supabase/migrations` in order, each once.
+2. Create your single account in the Supabase dashboard, then **disable sign-ups** —
+   the RLS policies grant any authenticated session full access, and that is only
+   safe because exactly one account exists.
+3. Fill in `.env.local`, then seed the empty database once:
+
+```bash
+npm run seed:cloud
 ```
 
-Apply the migrations in `supabase/migrations` in order. Both adapters implement the
-same `Repo` interface in `src/lib/db/adapter.ts`; nothing above that line knows which
-is in use.
+4. Put the two `NEXT_PUBLIC_` values in Vercel and redeploy — they are baked in at
+   build time. The service-role key stays on your machine; it bypasses RLS.
 
 ---
 
@@ -65,7 +139,9 @@ src/
     recipe/            nutrition, score panels, servings, image prompt
     add/               the draft editor, match rows, bottom sheet, new-ingredient form
   lib/
-    db/                domain types + local and Supabase adapters
+    auth/              the single-account session
+    db/                domain types, the IndexedDB mirror, the outbox,
+                       CloudRepo and the Supabase remote
     nutrition/         unit conversion and unknown-aware calculation
     scoring/           health.ts, volume.ts, and their shared context
     explore/           filters, session lifecycle, candidate engine
@@ -169,9 +245,9 @@ restrained, no hands, no text, no props, and the least vessel the food actually 
 
 The other half of that loop is the camera button on the recipe hero: generate the
 photo elsewhere, then add it. Images are downscaled to 1100px and re-encoded as JPEG
-under ~320 KB before storage — with Supabase they go to the `recipe-images` bucket
-(created by the migration), and without it they are kept as data URLs on the device,
-where localStorage has a hard quota measured in single-digit megabytes.
+under ~320 KB before storage — they go to the `recipe-images` bucket
+(created by the migration), and one added with no signal waits in the device mirror
+until the queue drains.
 
 Until a photo exists, the recipe plate renders a composed colour field keyed to its
 cuisine rather than an empty box.
@@ -216,4 +292,11 @@ npm run typecheck
 node scripts/validate-seed.mjs
 ```
 
-The second checks that every seeded recipe ingredient resolves to a seeded ingredient.
+```bash
+npm run seed:cloud
+```
+
+`validate-seed` checks that every seeded recipe ingredient resolves to a seeded
+ingredient. `seed:cloud` populates an empty database with the starter collection — it
+writes through the same code path the app's own saves take, and every write is an
+upsert on a stable id, so re-running it is safe.

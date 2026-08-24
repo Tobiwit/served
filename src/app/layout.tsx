@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { AuthProvider } from '@/lib/auth/AuthProvider';
+import { AuthGate } from '@/components/auth/AuthGate';
 import { DataProvider } from '@/lib/store/DataProvider';
 import { ExploreProvider } from '@/lib/store/ExploreProvider';
+import { ServiceWorker } from '@/components/shell/ServiceWorker';
 import { TabBar } from '@/components/shell/TabBar';
 import { MotionConfig } from 'motion/react';
 
@@ -38,12 +41,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={inter.variable}>
       <body>
         <MotionConfig reducedMotion="user">
-          <DataProvider>
-            <ExploreProvider>
-              {children}
-              <TabBar />
-            </ExploreProvider>
-          </DataProvider>
+          <ServiceWorker />
+          {/* the gate wraps the providers, not just the screens: without a session
+              there is nothing to load, and a pull would only come back empty */}
+          <AuthProvider>
+            <AuthGate>
+              <DataProvider>
+                <ExploreProvider>
+                  {children}
+                  <TabBar />
+                </ExploreProvider>
+              </DataProvider>
+            </AuthGate>
+          </AuthProvider>
         </MotionConfig>
       </body>
     </html>

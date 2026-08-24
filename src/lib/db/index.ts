@@ -1,17 +1,16 @@
-import { LocalRepo } from './local';
-import { SupabaseRepo, supabaseClient } from './supabase';
-import type { Repo } from './adapter';
+import { CloudRepo } from './cloud';
 
-let repo: Repo | null = null;
+let repo: CloudRepo | null = null;
 
-/** Supabase when configured, the seeded local store otherwise. */
-export function getRepo(): Repo {
-  if (!repo) {
-    const db = supabaseClient();
-    repo = db ? new SupabaseRepo(db) : new LocalRepo();
-  }
+/**
+ * One store, one instance. The mirror, the outbox and the sync loop all hang off it,
+ * so a second copy would mean a second queue draining the same rows.
+ */
+export function getRepo(): CloudRepo {
+  if (!repo) repo = new CloudRepo();
   return repo;
 }
 
-export type { Repo } from './adapter';
+export { CloudRepo } from './cloud';
+export type { Repo, SyncState } from './adapter';
 export * from './types';
