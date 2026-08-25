@@ -97,11 +97,31 @@ export function ArcSpanSlider({
     [arch, width],
   );
 
+  /**
+   * The baseline, as marks rather than a rule.
+   *
+   * A solid line said nothing about where the arches land — it was just the floor
+   * they stood on. Marking each arch's foot, with a half-step between neighbours,
+   * turns the floor into the scale itself: you can see which rung you are on and
+   * how far the next one is without reading the number.
+   *
+   * Index 0 is skipped — the lime anchor already occupies the origin.
+   */
+  const feet = useMemo(() => {
+    if (width <= 0) return [];
+    const steps = RUNGS * 2;
+    return Array.from({ length: steps }, (_, i) => {
+      const k = (i + 1) / steps;
+      return { k, x: x0 + (x1 - x0) * k, major: (i + 1) % 2 === 0 };
+    });
+  }, [width, x0, x1]);
+
   const lit = arch(Math.max(0.02, t));
 
   const rungCol = active ? 'rgba(255,255,255,0.3)' : 'rgba(14,15,17,0.12)';
   const litCol = active ? '#ffffff' : 'rgba(14,15,17,0.55)';
-  const baseCol = active ? 'rgba(255,255,255,0.4)' : 'rgba(14,15,17,0.16)';
+  const dotDim = active ? 'rgba(255,255,255,0.32)' : 'rgba(14,15,17,0.14)';
+  const dotLit = active ? 'rgba(255,255,255,0.85)' : 'rgba(14,15,17,0.42)';
   const textCol = active ? 'rgba(255,255,255,0.68)' : 'rgba(14,15,17,0.32)';
 
   return (
@@ -150,7 +170,19 @@ export function ArcSpanSlider({
             <path key={i} d={d} fill="none" stroke={rungCol} strokeWidth={0.8} strokeLinecap="round" />
           ))}
 
-          <line x1={x0} x2={x1} y1={baseY} y2={baseY} stroke={baseCol} strokeWidth={1} strokeLinecap="round" />
+          {/* the baseline, marked rather than ruled — a foot under every arch and a
+              half-step between each pair. Marks inside the span you have pulled out
+              come up, so the reading is legible from the floor as well as the curve. */}
+          {feet.map(({ k, x, major }) => (
+            <circle
+              key={k}
+              cx={round(x)}
+              cy={baseY}
+              r={major ? 1.6 : 1}
+              fill={k <= t + 0.001 ? dotLit : dotDim}
+              style={{ transition: 'fill 220ms linear' }}
+            />
+          ))}
 
           {/* the one arch you drag */}
           <motion.path

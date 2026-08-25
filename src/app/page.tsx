@@ -15,6 +15,7 @@ import { DottedScale } from '@/components/instrument/DottedScale';
 import { VerticalDottedScale } from '@/components/instrument/VerticalDottedScale';
 import { GlassDial } from '@/components/instrument/GlassDial';
 import { ArcSpanSlider } from '@/components/instrument/ArcSpanSlider';
+import { SineSlider } from '@/components/instrument/SineSlider';
 import { StartGate } from '@/components/start/StartGate';
 import { ease, spring } from '@/lib/motion';
 
@@ -205,16 +206,17 @@ export default function SetupPage() {
           </FilterPanel>
 
           <FilterPanel {...panel('health')} variant="compact" numberSize={24} radius={26}>
-            <DottedScale
+            <SineSlider
               min={QUANT_SPECS.health.min}
               max={QUANT_SPECS.health.max}
               step={QUANT_SPECS.health.step}
               value={f.health.value}
               onChange={(v) => setValue('health', v)}
-              direction="atLeast"
               labels={[0, 50, 100]}
               label="Health"
-              height={42}
+              // matches the volume scale above it, and gives the single-cycle wave
+              // the depth a 45° crossing needs
+              height={62}
               ink={f.health.on ? 'lume' : 'ink'}
             />
           </FilterPanel>
