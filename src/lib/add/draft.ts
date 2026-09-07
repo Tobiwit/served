@@ -34,6 +34,17 @@ export interface DraftIngredient {
   ingredientId: string | null;
   /** the user has explicitly accepted or chosen this match */
   confirmed: boolean;
+  /** the link was made by the matcher, not chosen — so retyping may undo it */
+  autoMatched: boolean;
+  /**
+   * The user has said this line is not the ingredient the matcher keeps offering.
+   *
+   * Without it, "light mozzarella" is a trap: the matcher is confident enough to
+   * accept Mozzarella on its own, and every attempt to retype the line simply
+   * matches it again. This says "stop offering", and only picking an ingredient or
+   * emptying the field clears it.
+   */
+  unlinked: boolean;
   /** folded down to a summary line — a settled ingredient is not worth a card */
   collapsed: boolean;
 }
@@ -83,6 +94,9 @@ export function applyMatch(
     ...row,
     ingredientId: ingredient?.id ?? null,
     confirmed: true,
+    // chosen, not guessed — so a later edit to the name is a wording change
+    autoMatched: false,
+    unlinked: false,
     role: ingredient?.default_basic ? 'basic' : row.role,
     name: ingredient && !row.customName ? ingredient.name : row.name,
   };
@@ -131,6 +145,8 @@ export function draftIngredient(
     match,
     ingredientId: ing?.id ?? null,
     confirmed: match.status === 'accepted',
+    autoMatched: !!ing,
+    unlinked: false,
     collapsed: match.status === 'accepted',
   };
   d.grams = resolveGrams(d, index);
@@ -177,6 +193,9 @@ export function draftFromRecipe(recipe: Recipe, index: Map<string, Ingredient>):
       match: { query: ri.display_name, status: 'none', best: null, alternatives: [] },
       ingredientId: ri.ingredient_id,
       confirmed: true,
+      // a saved link is a decision that was already made, not a guess
+      autoMatched: false,
+      unlinked: false,
       collapsed: true,
     });
 
@@ -201,6 +220,8 @@ export function draftFromRecipe(recipe: Recipe, index: Map<string, Ingredient>):
         match: { query: sub.display_name, status: 'none', best: null, alternatives: [] },
         ingredientId: sub.substitute_ingredient_id,
         confirmed: true,
+        autoMatched: false,
+        unlinked: false,
         collapsed: true,
       });
       parent = k;
@@ -254,7 +275,32 @@ export function blankIngredient(swapOf: string | null = null): DraftIngredient {
     match: { query: '', status: 'none', best: null, alternatives: [] },
     ingredientId: null,
     confirmed: false,
+    autoMatched: false,
+    unlinked: false,
     collapsed: false,
+  };
+}
+
+/**
+ * Take the ingredient off a row and give it back the words that were typed.
+ *
+ * The row stays in the recipe and stays finished with — it simply has no nutrition
+ * behind it now, and offers Search and Create new instead. `unlinked` stops the
+ * matcher from re-attaching the same ingredient the moment the name is touched.
+ */
+export function unlinkMatch(row: DraftIngredient): DraftIngredient {
+  const name = row.typedName.trim() || row.name;
+  return {
+    ...row,
+    name,
+    typedName: name,
+    customName: false,
+    ingredientId: null,
+    autoMatched: false,
+    unlinked: true,
+    confirmed: true,
+    collapsed: false,
+    match: { query: name, status: 'none', best: null, alternatives: [] },
   };
 }
 

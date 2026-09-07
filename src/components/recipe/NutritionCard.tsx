@@ -3,7 +3,7 @@
 import { motion } from 'motion/react';
 import { DottedNumber } from '@/components/instrument/DottedNumber';
 import { DotBars } from '@/components/instrument/DotBars';
-import type { NutritionResult } from '@/lib/nutrition/calc';
+import { scaleNutrition, type NutritionResult } from '@/lib/nutrition/calc';
 import { spring } from '@/lib/motion';
 
 /**
@@ -12,6 +12,12 @@ import { spring } from '@/lib/motion';
  * Unknown values print as an em dash, never as zero, and the card says how much of
  * the dish it could actually account for. Precision it does not have is precision
  * it does not claim.
+ *
+ * `servings` is the count currently on the stepper, not the number the recipe was
+ * written for, and the whole-recipe figure is built from the per-serving one rather
+ * than read off the stored total. Otherwise the two readings answer different
+ * questions — the ingredient list scaled to what you are cooking, the total stuck on
+ * what the recipe said — and at one serving they disagreed for no visible reason.
  */
 
 export function NutritionCard({
@@ -27,7 +33,7 @@ export function NutritionCard({
   onToggleTotal: () => void;
   gramsPerServing: number;
 }) {
-  const n = showTotal ? nutrition.total : nutrition.perServing;
+  const n = showTotal ? scaleNutrition(nutrition.perServing, servings) : nutrition.perServing;
   const complete = Math.round(nutrition.completeness * 100);
 
   // energy split by calories, not by grams — the only honest way to draw this
@@ -51,7 +57,7 @@ export function NutritionCard({
           className="t-micro"
           style={{ color: 'var(--ink-45)', padding: '2px 0' }}
         >
-          {showTotal ? `whole recipe · ${servings} servings` : 'per serving'}
+          {showTotal ? `all ${servings} serving${servings === 1 ? '' : 's'}` : 'per serving'}
         </button>
       </header>
 

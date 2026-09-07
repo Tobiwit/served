@@ -36,7 +36,7 @@ import { ease, spring } from '@/lib/motion';
 
 export default function SetupPage() {
   const router = useRouter();
-  const { recipes, analysisFor, ready } = useData();
+  const { recipes, analysisFor } = useData();
   const { session, setFilters, start, resetKeepFilters } = useExplore();
   const f = session.filters;
 
@@ -112,12 +112,12 @@ export default function SetupPage() {
         transition={{ duration: 0.5, ease: ease.arrive }}
         style={{ flex: '0 0 auto' }}
       >
-        <h1 className="t-title" style={{ margin: 0 }}>
+        {/* One quiet line. The count it used to carry is the whole point of the
+            readout directly below it, and the two lines together were costing the
+            filters the vertical room their scales actually need. */}
+        <h1 className="t-sub" style={{ margin: 0 }}>
           What are we eating?
         </h1>
-        <p className="t-micro t-dim" style={{ margin: '4px 0 0' }}>
-          {ready ? `${recipes.length} recipes available` : 'Reading the shelf…'}
-        </p>
       </motion.header>
 
       <MatchHero matching={matching} total={recipes.length} litMap={litMap} />

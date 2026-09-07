@@ -17,12 +17,13 @@ import { ease } from '@/lib/motion';
 export default function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { recipes, ingredientIndex, analysisFor, saveRecipe, ready } = useData();
+  // by id, so a recipe still opens from a link while the starter collection is hidden
+  const { allRecipes, ingredientIndex, analysisFor, saveRecipe, ready } = useData();
 
   const [servings, setServings] = useState<number | null>(null);
   const [showTotal, setShowTotal] = useState(false);
 
-  const recipe = useMemo(() => recipes.find((r) => r.id === id) ?? null, [recipes, id]);
+  const recipe = useMemo(() => allRecipes.find((r) => r.id === id) ?? null, [allRecipes, id]);
   const analysis = useMemo(() => (recipe ? analysisFor(recipe) : null), [recipe, analysisFor]);
 
   if (!ready) return <main className="screen" style={{ paddingTop: 120 }} />;
@@ -148,7 +149,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         <div style={{ display: 'grid', gap: 10, marginTop: 22 }}>
           <NutritionCard
             nutrition={analysis.nutrition}
-            servings={recipe.servings}
+            servings={shown}
             showTotal={showTotal}
             onToggleTotal={() => setShowTotal((v) => !v)}
             gramsPerServing={analysis.gramsPerServing}

@@ -42,6 +42,7 @@ export function MatchRow({
   draft,
   index,
   onChange,
+  onUnlink,
   onSearch,
   onCreate,
   onRemove,
@@ -49,6 +50,7 @@ export function MatchRow({
   draft: DraftIngredient;
   index: Map<string, Ingredient>;
   onChange: (patch: Partial<DraftIngredient>) => void;
+  onUnlink: () => void;
   onSearch: () => void;
   onCreate: () => void;
   onRemove: () => void;
@@ -58,6 +60,18 @@ export function MatchRow({
   const isSwap = draft.swapOf !== null;
   const settled = isResolved(draft);
   const collapsed = settled && draft.collapsed;
+
+  /**
+   * What this line actually contributes, not what the ingredient is worth per 100 g.
+   *
+   * The recipe says 200 g of pasta; "352 kcal" is the number being decided about,
+   * and the per-100 g figure is a property of the database that happens to be how
+   * it is stored.
+   */
+  const kcal =
+    matched?.kcal_100g != null && draft.grams != null && draft.grams > 0
+      ? Math.round((draft.grams / 100) * matched.kcal_100g)
+      : null;
 
   // only worth offering when the two names actually differ
   const canKeepOwnName = !!matched && !!draft.typedName.trim() && draft.typedName.trim() !== matched.name;
@@ -113,7 +127,13 @@ export function MatchRow({
                   {draft.name}
                 </span>
                 <span className="t-micro t-dim-2" style={{ flex: '0 0 auto', fontSize: 10.5 }}>
-                  {matched ? (matched.kcal_100g == null ? 'no data' : `${matched.kcal_100g} kcal`) : 'no match'}
+                  {!matched
+                    ? 'no match'
+                    : kcal != null
+                      ? `${kcal} kcal`
+                      : matched.kcal_100g == null
+                        ? 'no data'
+                        : `${matched.kcal_100g}/100 g`}
                 </span>
                 {!isSwap && ROLE_SHORT[draft.role] && (
                   <span className="t-micro t-dim-2" style={{ flex: '0 0 auto', fontSize: 10.5 }}>
@@ -213,10 +233,16 @@ export function MatchRow({
                         ✓ {matched.name}
                       </span>
                       <span className="t-micro t-dim-2">
-                        {matched.kcal_100g == null ? 'no nutrition data' : `${matched.kcal_100g} kcal / 100g`}
+                        {matched.kcal_100g == null
+                          ? 'no nutrition data'
+                          : kcal != null
+                            ? `${kcal} kcal · ${matched.kcal_100g} / 100 g`
+                            : `${matched.kcal_100g} kcal / 100 g`}
                       </span>
                       <span style={{ flex: 1 }} />
                       <TinyAction label="Change" onClick={onSearch} />
+                      {/* the way out of a match you never asked for */}
+                      <TinyAction label="Not this" onClick={onUnlink} />
                     </div>
 
                     {/* Matching adopts the ingredient's name so the collection reads as

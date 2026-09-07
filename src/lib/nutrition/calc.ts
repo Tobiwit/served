@@ -102,6 +102,22 @@ export function computeNutrition(recipe: Recipe, index: Map<string, Ingredient>)
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
+/**
+ * The same plate, more of it. Unknown stays unknown — multiplying a blank by three
+ * does not turn it into a number.
+ */
+export function scaleNutrition(n: Nutrition, factor: number): Nutrition {
+  const out: Nutrition = { ...EMPTY_NUTRITION };
+  for (const m of MACROS) out[m] = n[m] == null ? null : round(n[m]! * factor);
+  return out;
+}
+
+/** Energy in one line of a recipe, given what it weighs. */
+export function lineKcal(grams: number | null | undefined, ingredient: Ingredient | null | undefined): number | null {
+  if (grams == null || grams <= 0 || ingredient?.kcal_100g == null) return null;
+  return Math.round((grams / 100) * ingredient.kcal_100g);
+}
+
 export function formatMacro(v: number | null, unit = 'g'): string {
   if (v == null) return '—';
   return `${Math.round(v)}${unit}`;

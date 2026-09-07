@@ -17,9 +17,9 @@ import { RecipeEditor } from '@/components/add/RecipeEditor';
 export default function EditRecipePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { recipes, ingredientIndex, saveRecipe, ready } = useData();
+  const { allRecipes, ingredientIndex, saveRecipe, ready } = useData();
 
-  const recipe = recipes.find((r) => r.id === id) ?? null;
+  const recipe = allRecipes.find((r) => r.id === id) ?? null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
 

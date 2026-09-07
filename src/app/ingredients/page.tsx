@@ -14,20 +14,22 @@ import { spring } from '@/lib/motion';
  * from it — so editing a value here changes every recipe that uses it.
  */
 export default function IngredientsPage() {
-  const { ingredients, saveIngredient, deleteIngredient, recipes } = useData();
+  // usage is a fact about the database, so it counts every recipe stored — not
+  // only the ones the current view is showing
+  const { ingredients, saveIngredient, deleteIngredient, allRecipes } = useData();
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<Ingredient | null>(null);
   const [creating, setCreating] = useState(false);
 
   const usage = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const r of recipes) {
+    for (const r of allRecipes) {
       for (const ri of r.ingredients) {
         if (ri.ingredient_id) counts.set(ri.ingredient_id, (counts.get(ri.ingredient_id) ?? 0) + 1);
       }
     }
     return counts;
-  }, [recipes]);
+  }, [allRecipes]);
 
   const visible = useMemo(() => {
     const list = q.trim() ? searchIngredients(q, ingredients, 200) : ingredients;
@@ -143,9 +145,10 @@ export default function IngredientsPage() {
             <NewIngredientForm
               key={editing.id}
               initialName={editing.name}
+              initial={editing}
               onSkip={() => setEditing(null)}
               onCreate={async (payload) => {
-                await saveIngredient({ ...payload, id: editing.id, aliases: editing.aliases, unit_conversions: editing.unit_conversions });
+                await saveIngredient({ ...payload, id: editing.id });
                 setEditing(null);
               }}
             />

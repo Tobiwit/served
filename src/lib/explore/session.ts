@@ -20,6 +20,28 @@ export interface ExploreSession {
 
 const KEY = 'served.explore.v1';
 
+/**
+ * sessionStorage is empty on a cold open and on a PWA relaunch, and survives
+ * navigation within the app — which is exactly the definition of "this launch".
+ */
+const LAUNCH_KEY = 'served.launch';
+
+/** Memoised: React runs mount effects twice in development, and a launch is once. */
+let launch: boolean | null = null;
+
+function isNewLaunch(): boolean {
+  if (launch !== null) return launch;
+  try {
+    launch = window.sessionStorage.getItem(LAUNCH_KEY) !== '1';
+    window.sessionStorage.setItem(LAUNCH_KEY, '1');
+  } catch {
+    // private mode: without somewhere to record the launch, treat every read as a
+    // continuation rather than resetting the filters mid-session
+    launch = false;
+  }
+  return launch;
+}
+
 export function today(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -37,7 +59,9 @@ export function loadSession(): ExploreSession {
     const parsed = JSON.parse(raw) as ExploreSession;
     // a new day is a new mood
     if (parsed.date !== today()) return emptySession();
-    const filters = { ...defaultFilters(), ...parsed.filters };
+    // and so is a new launch: yesterday's mood is stale, but so is this morning's.
+    // What you excluded and what you have already seen still belong to the run.
+    const filters = isNewLaunch() ? defaultFilters() : { ...defaultFilters(), ...parsed.filters };
     // a session stored yesterday can still name a course that no longer exists
     filters.courses = [...new Set(filters.courses.map(normalizeCourse).filter((c) => c !== null))];
     return { ...emptySession(), ...parsed, filters };

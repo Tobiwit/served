@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
 import { useAuth } from '@/lib/auth/AuthProvider';
 import { HEALTH_CONFIG, VOLUME_CONFIG } from '@/lib/scoring';
+import { isSeededRecipe } from '@/seed/seeded-ids';
+import { spring } from '@/lib/motion';
 
 export default function SettingsPage() {
-  const { recipes, ingredients, sync, syncNow, refreshFromCloud } = useData();
+  const { recipes, allRecipes, ingredients, sync, syncNow, refreshFromCloud, hideSeeded, setHideSeeded } =
+    useData();
   const { reset } = useExplore();
   const { email, signOut } = useAuth();
   const [standalone, setStandalone] = useState(false);
@@ -20,6 +24,8 @@ export default function SettingsPage() {
     setStandalone(window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true);
   }, []);
 
+  const starters = allRecipes.filter((r) => isSeededRecipe(r.id)).length;
+
   return (
     <main className="screen" style={{ paddingTop: 'calc(var(--safe-t) + 26px)' }}>
       <header style={{ marginBottom: 22 }}>
@@ -30,7 +36,24 @@ export default function SettingsPage() {
 
       <Group title="Collection">
         <RowLink href="/ingredients" label="Ingredient database" value={`${ingredients.length} entries`} />
-        <RowLink href="/library" label="Recipes" value={`${recipes.length} saved`} />
+        <RowLink
+          href="/library"
+          label="Recipes"
+          value={hideSeeded ? `${recipes.length} of ${allRecipes.length} shown` : `${recipes.length} saved`}
+        />
+
+        {/* A view, not a deletion. The starter rows stay in the database exactly as
+            they are — this only decides whether the app looks at them. */}
+        <Toggle
+          label="Only my recipes"
+          detail={
+            hideSeeded
+              ? `${starters} starter recipe${starters === 1 ? '' : 's'} hidden — nothing was deleted`
+              : `Hides the ${starters} recipe${starters === 1 ? '' : 's'} the app came with`
+          }
+          on={hideSeeded}
+          onToggle={() => setHideSeeded(!hideSeeded)}
+        />
       </Group>
 
       <Group title="Sync">
@@ -192,6 +215,54 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="t-body">{label}</span>
       <span className="t-micro t-dim-2">{value}</span>
     </div>
+  );
+}
+
+/** A row that is a switch: the whole thing is the target, the pip says where it is. */
+function Toggle({
+  label,
+  detail,
+  on,
+  onToggle,
+}: {
+  label: string;
+  detail: string;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      className="surface hairline"
+      style={{ ...rowStyle, width: '100%', textAlign: 'left', flexDirection: 'row', alignItems: 'center', gap: 12 }}
+    >
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span className="t-body">{label}</span>
+        <span className="t-micro t-dim-2">{detail}</span>
+      </span>
+      <span
+        aria-hidden
+        style={{
+          flex: '0 0 auto',
+          width: 40,
+          height: 24,
+          borderRadius: 24,
+          padding: 3,
+          display: 'flex',
+          justifyContent: on ? 'flex-end' : 'flex-start',
+          background: on ? 'var(--ink)' : 'var(--ink-08)',
+          transition: 'background 240ms ease',
+        }}
+      >
+        <motion.span
+          layout
+          transition={spring.dial}
+          style={{ width: 18, height: 18, borderRadius: 18, background: 'var(--paper)', boxShadow: 'var(--lift-1)' }}
+        />
+      </span>
+    </button>
   );
 }
 

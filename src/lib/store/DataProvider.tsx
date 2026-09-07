@@ -12,6 +12,8 @@ import type {
 import type { SyncState } from '@/lib/db/adapter';
 import { getRepo } from '@/lib/db';
 import { analyzeRecipe, type RecipeAnalysis } from '@/lib/scoring';
+import { isSeededRecipe } from '@/seed/seeded-ids';
+import { loadPrefs, savePrefs } from '@/lib/prefs';
 
 /**
  * The whole collection lives in memory. A personal recipe box is small, and
@@ -29,7 +31,10 @@ const RETRY_MS = 30_000;
 
 interface DataValue {
   ready: boolean;
+  /** the collection as it should be seen — the starter recipes may be hidden */
   recipes: Recipe[];
+  /** everything that is actually stored, whatever the view is set to */
+  allRecipes: Recipe[];
   ingredients: Ingredient[];
   cookLog: CookLogEntry[];
   ingredientIndex: Map<string, Ingredient>;
@@ -44,12 +49,18 @@ interface DataValue {
   sync: SyncState;
   syncNow: () => Promise<void>;
   refreshFromCloud: () => Promise<void>;
+  /** device preference — hides the starter collection without deleting anything */
+  hideSeeded: boolean;
+  setHideSeeded: (v: boolean) => void;
 }
 
 const Ctx = createContext<DataValue | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  // read after mount, not in the initialiser: localStorage does not exist on the
+  // server, and a lazy initialiser would make the first client render disagree
+  const [hideSeeded, setHide] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [cookLog, setCookLog] = useState<CookLogEntry[]>([]);
   const [ready, setReady] = useState(false);
@@ -74,6 +85,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return () => {
       alive.current = false;
     };
+  }, []);
+
+  useEffect(() => setHide(loadPrefs().hideSeeded), []);
+
+  const setHideSeeded = useCallback((v: boolean) => {
+    setHide(v);
+    savePrefs({ ...loadPrefs(), hideSeeded: v });
   }, []);
 
   useEffect(() => repo.subscribe(() => setSync(repo.syncState())), [repo]);
@@ -129,6 +147,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const timer = window.setInterval(() => void syncNow(), RETRY_MS);
     return () => window.clearInterval(timer);
   }, [ready, sync.pending, syncNow]);
+
+  /**
+   * Hiding the starter collection is a filter over the list every screen reads, not
+   * a deletion: the rows stay in the database untouched, and turning it off brings
+   * them straight back. Anything that needs a recipe *by id* — a detail screen, an
+   * edit — reads `allRecipes`, so an old link never lands on "not in the collection".
+   */
+  const visibleRecipes = useMemo(
+    () => (hideSeeded ? recipes.filter((r) => !isSeededRecipe(r.id)) : recipes),
+    [recipes, hideSeeded],
+  );
 
   const ingredientIndex = useMemo(() => new Map(ingredients.map((i) => [i.id, i])), [ingredients]);
 
@@ -210,7 +239,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<DataValue>(
     () => ({
       ready,
-      recipes,
+      recipes: visibleRecipes,
+      allRecipes: recipes,
       ingredients,
       cookLog,
       ingredientIndex,
@@ -224,9 +254,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       sync,
       syncNow,
       refreshFromCloud,
+      hideSeeded,
+      setHideSeeded,
     }),
     [
       ready,
+      visibleRecipes,
       recipes,
       ingredients,
       cookLog,
@@ -241,6 +274,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       sync,
       syncNow,
       refreshFromCloud,
+      hideSeeded,
+      setHideSeeded,
     ],
   );
 

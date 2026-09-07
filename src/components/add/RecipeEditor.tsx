@@ -12,6 +12,7 @@ import {
   resolveGrams,
   setCustomName,
   settleNames,
+  unlinkMatch,
   unresolvedCount,
   withSwapRows,
   type Draft,
@@ -75,9 +76,23 @@ export function RecipeEditor({
             if ('name' in changes) {
               const typed = changes.name ?? '';
               next.typedName = typed;
-              if (row.ingredientId && row.confirmed) {
-                // Renaming a settled ingredient is a wording choice, not a new
-                // question: the nutrition stays attached and the row simply stops
+
+              if (!typed.trim()) {
+                // Emptying the line empties it completely. Backspacing a name used to
+                // leave the matched ingredient behind, so a row that had latched onto
+                // the wrong thing could never be talked out of it.
+                next.match = { query: '', status: 'none', best: null, alternatives: [] };
+                next.ingredientId = null;
+                next.confirmed = false;
+                next.customName = false;
+                next.autoMatched = false;
+                next.unlinked = false;
+              } else if (row.unlinked) {
+                // told once that this is not that ingredient; do not offer it again
+                next.customName = false;
+              } else if (row.ingredientId && row.confirmed && !row.autoMatched) {
+                // Renaming an ingredient you chose yourself is a wording choice, not a
+                // new question: the nutrition stays attached and the row simply stops
                 // following the canonical name.
                 next.customName = true;
               } else {
@@ -87,6 +102,7 @@ export function RecipeEditor({
                 const auto = next.match.status === 'accepted' ? next.match.best : null;
                 next.ingredientId = auto?.ingredient.id ?? null;
                 next.confirmed = !!auto;
+                next.autoMatched = !!auto;
                 next.customName = false;
                 if (auto?.ingredient.default_basic) next.role = 'basic';
               }
@@ -115,6 +131,24 @@ export function RecipeEditor({
       );
     },
     [ingredients, ingredientIndex, setDraft],
+  );
+
+  /** Take the matched ingredient off a row, without disturbing the rest of it. */
+  const unlink = useCallback(
+    (rowKey: string) => {
+      setDraft((d) =>
+        withSwapRows({
+          ...d,
+          ingredients: d.ingredients.map((row) => {
+            if (row.key !== rowKey) return row;
+            const next = unlinkMatch(row);
+            next.grams = resolveGrams(next, ingredientIndex);
+            return next;
+          }),
+        }),
+      );
+    },
+    [ingredientIndex, setDraft],
   );
 
   /**
@@ -169,6 +203,7 @@ export function RecipeEditor({
                 draft={row}
                 index={ingredientIndex}
                 onChange={(changes) => patch(row.key, changes)}
+                onUnlink={() => unlink(row.key)}
                 onSearch={() => setSheet({ mode: 'search', key: row.key })}
                 onCreate={() => setSheet({ mode: 'create', key: row.key })}
                 onRemove={() => setDraft((d) => removeRow(d, row.key))}

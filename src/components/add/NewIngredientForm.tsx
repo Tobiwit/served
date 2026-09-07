@@ -6,7 +6,12 @@ import { CATEGORY_LABEL, INGREDIENT_CATEGORIES } from '@/lib/db/types';
 import { searchName } from '@/seed/build';
 
 /**
- * Creating an ingredient the database has never seen.
+ * Creating an ingredient the database has never seen — or correcting one it holds.
+ *
+ * Pass `initial` and the same form becomes an editor: every field opens on the
+ * stored value, the actions change wording, and everything the form does not ask
+ * about — aliases, unit conversions, water — is carried through untouched rather
+ * than quietly reset to empty.
  *
  * Calories lead because they are the value that makes the rest of the app work.
  * Every other macro is genuinely optional — left blank it stays unknown, and the
@@ -21,21 +26,25 @@ import { searchName } from '@/seed/build';
  */
 export function NewIngredientForm({
   initialName,
+  initial = null,
   onCreate,
   onSkip,
 }: {
   initialName: string;
+  /** the stored ingredient being corrected, or null when this is a new one */
+  initial?: Ingredient | null;
   onCreate: (i: NewIngredient) => void;
   onSkip: () => void;
 }) {
-  const [name, setName] = useState(initialName);
-  const [category, setCategory] = useState<IngredientCategory>('other');
-  const [kcal, setKcal] = useState('');
-  const [protein, setProtein] = useState('');
-  const [carbs, setCarbs] = useState('');
-  const [fat, setFat] = useState('');
-  const [fiber, setFiber] = useState('');
-  const [basic, setBasic] = useState(false);
+  const editing = initial !== null;
+  const [name, setName] = useState(initial?.name ?? initialName);
+  const [category, setCategory] = useState<IngredientCategory>(initial?.category ?? 'other');
+  const [kcal, setKcal] = useState(text(initial?.kcal_100g));
+  const [protein, setProtein] = useState(text(initial?.protein_100g));
+  const [carbs, setCarbs] = useState(text(initial?.carbs_100g));
+  const [fat, setFat] = useState(text(initial?.fat_100g));
+  const [fiber, setFiber] = useState(text(initial?.fiber_100g));
+  const [basic, setBasic] = useState(initial?.default_basic ?? false);
 
   const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')));
 
@@ -51,10 +60,15 @@ export function NewIngredientForm({
       carbs_100g: num(carbs),
       fat_100g: num(fat),
       fiber_100g: num(fiber),
-      water_100g: null,
+      // the form never asks for water, so an edit must not answer for it
+      water_100g: initial?.water_100g ?? null,
       default_basic: basic,
-      aliases: initialName.trim() && initialName.trim().toLowerCase() !== trimmed.toLowerCase() ? [initialName.trim()] : [],
-      unit_conversions: [],
+      aliases: initial
+        ? aliasesAfterRename(initial, trimmed)
+        : initialName.trim() && initialName.trim().toLowerCase() !== trimmed.toLowerCase()
+          ? [initialName.trim()]
+          : [],
+      unit_conversions: initial?.unit_conversions ?? [],
     };
     onCreate(ingredient);
   };
@@ -65,7 +79,7 @@ export function NewIngredientForm({
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Protein tortilla"
+          placeholder={editing ? 'Name' : 'Protein tortilla'}
           style={inputStyle}
           aria-label="Ingredient name"
         />
@@ -158,7 +172,7 @@ export function NewIngredientForm({
           className="surface hairline"
           style={{ flex: '0 0 auto', padding: '13px 16px', borderRadius: 'var(--r-pill)', fontSize: 14, fontWeight: 300, color: 'var(--ink-45)' }}
         >
-          Skip nutrition
+          {editing ? 'Cancel' : 'Skip nutrition'}
         </button>
         <button
           type="button"
@@ -175,11 +189,27 @@ export function NewIngredientForm({
             opacity: name.trim() ? 1 : 0.4,
           }}
         >
-          Create ingredient
+          {editing ? 'Save changes' : 'Create ingredient'}
         </button>
       </div>
     </div>
   );
+}
+
+/** A stored macro as it should appear in a text field: blank stays blank, not "0". */
+function text(v: number | null | undefined): string {
+  return v == null ? '' : String(v);
+}
+
+/**
+ * Renaming an ingredient keeps the old wording as an alias, so the recipes and the
+ * imports that still say "courgette" go on matching after it becomes "zucchini".
+ */
+function aliasesAfterRename(initial: Ingredient, name: string): string[] {
+  if (initial.name.toLowerCase() === name.toLowerCase()) return initial.aliases;
+  return initial.aliases.some((a) => a.toLowerCase() === initial.name.toLowerCase())
+    ? initial.aliases
+    : [...initial.aliases, initial.name];
 }
 
 const inputStyle: React.CSSProperties = {
