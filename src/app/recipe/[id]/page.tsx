@@ -2,8 +2,11 @@
 
 import { use, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
+import { useExplore } from '@/lib/store/ExploreProvider';
+import { useShopping } from '@/lib/store/ShoppingProvider';
+import { recipeForRun, runState } from '@/lib/explore/liveRecipe';
 import { COURSE_LABEL } from '@/lib/db/types';
 import { RecipeImage } from '@/components/explore/RecipeImage';
 import { NutritionCard } from '@/components/recipe/NutritionCard';
@@ -12,18 +15,38 @@ import { ServingStepper } from '@/components/recipe/ServingStepper';
 import { IngredientLines } from '@/components/recipe/IngredientLines';
 import { CopyPromptButton } from '@/components/recipe/CopyPromptButton';
 import { PhotoControl } from '@/components/recipe/PhotoControl';
-import { ease } from '@/lib/motion';
+import { ease, spring } from '@/lib/motion';
 
 export default function RecipeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   // by id, so a recipe still opens from a link while the starter collection is hidden
   const { allRecipes, ingredientIndex, analysisFor, saveRecipe, ready } = useData();
+  const { session } = useExplore();
+  const { hasRecipe, addRecipe } = useShopping();
 
   const [servings, setServings] = useState<number | null>(null);
   const [showTotal, setShowTotal] = useState(false);
+  const [asWritten, setAsWritten] = useState(false);
 
-  const recipe = useMemo(() => allRecipes.find((r) => r.id === id) ?? null, [allRecipes, id]);
+  const stored = useMemo(() => allRecipes.find((r) => r.id === id) ?? null, [allRecipes, id]);
+
+  /**
+   * What is actually being made. Ingredients ruled out during the run are gone from
+   * it and swapped slots are filled by whichever option is standing in, so the
+   * macros, the scores and the ingredient list all describe the same plate.
+   *
+   * None of it is written down — the stored recipe is untouched, and `As written`
+   * puts the original back on screen at any point.
+   */
+  const run = useMemo(() => runState(session.excluded, session.boosted), [session.excluded, session.boosted]);
+  const adjusted = useMemo(
+    () => (stored ? recipeForRun(stored, run, ingredientIndex) : null),
+    [stored, run, ingredientIndex],
+  );
+  const isAdjusted = !!stored && adjusted !== stored;
+  const recipe = asWritten ? stored : adjusted;
+
   const analysis = useMemo(() => (recipe ? analysisFor(recipe) : null), [recipe, analysisFor]);
 
   if (!ready) return <main className="screen" style={{ paddingTop: 120 }} />;
@@ -144,6 +167,8 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
               .filter(Boolean)
               .join(' · ')}
           </p>
+
+          {isAdjusted && <RunBadge asWritten={asWritten} onToggle={() => setAsWritten((v) => !v)} />}
         </motion.header>
 
         <div style={{ display: 'grid', gap: 10, marginTop: 22 }}>
@@ -173,6 +198,14 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         <ServingStepper value={shown} base={recipe.servings} onChange={setServings} />
 
         <IngredientLines recipe={recipe} index={ingredientIndex} scale={scale} />
+
+        {/* Directly under the ingredients, because that is what it acts on — and it
+            takes the list as shown: this many servings, minus anything ruled out. */}
+        <ShoppingButton
+          onAdd={() => addRecipe(recipe, ingredientIndex, scale)}
+          onOpen={() => router.push('/shopping')}
+          listed={hasRecipe(recipe.id)}
+        />
 
         <section style={{ marginTop: 28 }}>
           <h2 className="t-micro t-dim" style={{ margin: '0 0 14px', fontWeight: 300 }}>
@@ -209,6 +242,127 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         <CopyPromptButton recipe={recipe} index={ingredientIndex} />
       </div>
     </main>
+  );
+}
+
+/**
+ * Send these ingredients to the shopping list.
+ *
+ * Adding again replaces what this recipe already contributed rather than doubling
+ * it, so changing the servings and tapping once more is the natural way to correct
+ * the amounts — which is why the button keeps offering after the first tap instead
+ * of turning into a dead "added" state.
+ */
+function ShoppingButton({
+  onAdd,
+  onOpen,
+  listed,
+}: {
+  onAdd: () => void;
+  onOpen: () => void;
+  listed: boolean;
+}) {
+  const [flash, setFlash] = useState(false);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 18 }}>
+      <motion.button
+        type="button"
+        whileTap={{ scale: 0.985 }}
+        transition={spring.dial}
+        onClick={() => {
+          onAdd();
+          setFlash(true);
+          window.setTimeout(() => setFlash(false), 1600);
+        }}
+        className="surface hairline"
+        style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 9,
+          padding: '14px 18px',
+          borderRadius: 'var(--r-pill)',
+          fontSize: 13.5,
+          fontWeight: 300,
+          color: 'var(--ink-70)',
+        }}
+      >
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
+          <path
+            d="M1.6 2h1.9l1.7 7.4h6.3l1.4-5.2H4.2"
+            stroke="currentColor"
+            strokeWidth="1.15"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <circle cx="5.9" cy="12" r="1.05" fill="currentColor" />
+          <circle cx="10.9" cy="12" r="1.05" fill="currentColor" />
+        </svg>
+        {flash ? 'Added to the list' : listed ? 'Update shopping list' : 'Add to shopping list'}
+      </motion.button>
+
+      <AnimatePresence initial={false}>
+        {listed && (
+          <motion.button
+            key="open"
+            type="button"
+            onClick={onOpen}
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: 'auto' }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.24, ease: ease.arrive }}
+            className="t-micro t-dim"
+            style={{ flex: '0 0 auto', whiteSpace: 'nowrap', fontSize: 11.5, overflow: 'hidden' }}
+          >
+            View list →
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Says plainly that these numbers are not the recipe's own, and gives the original
+ * back in one tap. A quiet swap of the macros with no explanation would read as the
+ * app being wrong rather than as the app listening.
+ */
+function RunBadge({ asWritten, onToggle }: { asWritten: boolean; onToggle: () => void }) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onToggle}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: ease.arrive }}
+      className="t-micro"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 12,
+        padding: '6px 12px 6px 10px',
+        borderRadius: 'var(--r-pill)',
+        background: asWritten ? 'var(--ink-04)' : 'rgba(233,99,60,0.1)',
+        color: asWritten ? 'var(--ink-45)' : '#b84a26',
+        fontSize: 11.5,
+        textAlign: 'left',
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 5,
+          height: 5,
+          borderRadius: 5,
+          flex: '0 0 auto',
+          background: asWritten ? 'var(--ink-30)' : '#e9633c',
+        }}
+      />
+      {asWritten ? 'As written · show my version' : 'Adjusted for this run · show original'}
+    </motion.button>
   );
 }
 

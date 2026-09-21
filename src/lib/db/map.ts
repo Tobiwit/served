@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { CookLogEntry, Ingredient, Recipe, RecipeIngredient } from './types';
+import type { BacklogEntry, CookLogEntry, Ingredient, Recipe, RecipeIngredient } from './types';
 import { normalizeCourse } from './types';
 
 /**
@@ -74,6 +74,17 @@ export function mapCookLog(row: any): CookLogEntry {
     recipe_id: row.recipe_id,
     cooked_at: row.cooked_at,
     note: row.note ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export function mapBacklog(row: any): BacklogEntry {
+  return {
+    id: row.id,
+    title: row.title,
+    note: row.note ?? null,
+    image_url: row.image_url ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

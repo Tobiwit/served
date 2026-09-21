@@ -6,6 +6,8 @@ import { useData } from '@/lib/store/DataProvider';
 import { parseRecipeText } from '@/lib/parse/recipeText';
 import { draftFromParsed, emptyDraft, toNewRecipe, type Draft } from '@/lib/add/draft';
 import { RecipeEditor } from '@/components/add/RecipeEditor';
+import { Backlog, FromBacklogNote } from '@/components/add/Backlog';
+import type { BacklogEntry } from '@/lib/db/types';
 
 const SAMPLE = `Miso Butter Mushroom Toast
 Serves 2 · Prep 10 min · Cook 10 min
@@ -27,17 +29,33 @@ Method
 
 export default function AddPage() {
   const router = useRouter();
-  const { ingredients, ingredientIndex, saveRecipe } = useData();
+  const { ingredients, ingredientIndex, saveRecipe, deleteBacklog } = useData();
 
   const [text, setText] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  /** the backlog entry being written up, if this draft came from one */
+  const [from, setFrom] = useState<BacklogEntry | null>(null);
+
+  const startDraft = (next: Draft, source: BacklogEntry | null = null) => {
+    setFrom(source);
+    setDraft(next);
+  };
+
+  const leaveDraft = () => {
+    setFrom(null);
+    setDraft(null);
+  };
 
   const save = async () => {
     if (!draft) return;
     setSaving(true);
     try {
-      const saved = await saveRecipe(toNewRecipe({ ...draft, sourceText: text || null }, undefined, ingredientIndex));
+      const payload = toNewRecipe({ ...draft, sourceText: text || null }, undefined, ingredientIndex);
+      // the photo taken when it was noted down carries over — it is the same meal,
+      // and asking for it again is the friction the backlog exists to remove
+      const saved = await saveRecipe(from?.image_url ? { ...payload, image_url: from.image_url } : payload);
+      if (from) await deleteBacklog(from.id);
       router.push(`/recipe/${saved.id}`);
     } finally {
       setSaving(false);
@@ -80,7 +98,7 @@ export default function AddPage() {
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           <button
             type="button"
-            onClick={() => setDraft(draftFromParsed(parseRecipeText(text), ingredients, ingredientIndex))}
+            onClick={() => startDraft(draftFromParsed(parseRecipeText(text), ingredients, ingredientIndex))}
             disabled={!text.trim()}
             style={{
               flex: 1,
@@ -98,7 +116,7 @@ export default function AddPage() {
           </button>
           <button
             type="button"
-            onClick={() => setDraft(emptyDraft())}
+            onClick={() => startDraft(emptyDraft())}
             className="surface hairline"
             style={{ padding: '14px 20px', borderRadius: 'var(--r-pill)', fontSize: 14, fontWeight: 300, color: 'var(--ink-45)' }}
           >
@@ -114,6 +132,8 @@ export default function AddPage() {
         >
           Paste an example
         </button>
+
+        <Backlog onWriteUp={(entry) => startDraft({ ...emptyDraft(), title: entry.title }, entry)} />
       </main>
     );
   }
@@ -128,12 +148,15 @@ export default function AddPage() {
         saveLabel="Save recipe"
         savingLabel="Saving…"
         header={
-          <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-            <button type="button" onClick={() => setDraft(null)} className="t-micro t-dim">
-              ← Back
-            </button>
-            <span style={{ flex: 1 }} />
-          </header>
+          <>
+            <header style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+              <button type="button" onClick={leaveDraft} className="t-micro t-dim">
+                ← Back
+              </button>
+              <span style={{ flex: 1 }} />
+            </header>
+            {from && <FromBacklogNote title={from.title} />}
+          </>
         }
       />
     </main>

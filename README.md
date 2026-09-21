@@ -73,12 +73,19 @@ carrying one.
 | Recipes, ingredients, nutrition, substitutions | cloud + mirror |
 | Favourites, cooked history | cloud + mirror |
 | Photos | Supabase Storage, cached by the service worker |
+| Backlog — meals noted to write up later | cloud + mirror |
 | Explore filters, popped ingredients, recipes seen this run | local only |
+| The shopping list | local only |
 | Last open screen | local only |
 
 An Explore run is deliberately disposable — it holds what you want *today* — so it
 was never a candidate for syncing. It stays in `localStorage` and resets on a new
 calendar day.
+
+The shopping list stays local for a different reason. It is a working document for
+the next twenty minutes in a shop, and the one thing that has to be true of it is
+that ticking something off is instant and stays ticked in an aisle with no signal.
+Syncing would buy very little and put that at risk.
 
 ### Offline
 
@@ -110,7 +117,9 @@ The short version:
 cp .env.example .env.local
 ```
 
-1. Apply the migrations in `supabase/migrations` in order, each once.
+1. Apply the migrations in `supabase/migrations` in order, each once. An existing
+   database needs `0005_backlog.sql` before the backlog will sync — until it runs,
+   entries stay on the device and the rest of the sync carries on regardless.
 2. Create your single account in the Supabase dashboard, then **disable sign-ups** —
    the RLS policies grant any authenticated session full access, and that is only
    safe because exactly one account exists.
@@ -130,21 +139,23 @@ npm run seed:cloud
 ```
 src/
   app/                 routes: setup (/), explore, recipe/[id], recipe/[id]/edit,
-                       library, add, ingredients, settings, manifest + icons
+                       library, add, shopping, ingredients, settings, manifest + icons
   components/
     glass/             GradientField — the blurred colour field under frosted glass
     instrument/        dotted numerals, dotted scale, arc gauge, dot bars, ripple
     setup/             match readout, quantitative filter modules, chips, launch
     explore/           recipe plate, ingredient capsules, the glass mechanism
     recipe/            nutrition, score panels, servings, image prompt
-    add/               the draft editor, match rows, bottom sheet, new-ingredient form
+    add/               the draft editor, match rows, bottom sheet, new-ingredient
+                       form, the backlog
   lib/
     auth/              the single-account session
     db/                domain types, the IndexedDB mirror, the outbox,
                        CloudRepo and the Supabase remote
     nutrition/         unit conversion and unknown-aware calculation
     scoring/           health.ts, volume.ts, and their shared context
-    explore/           filters, session lifecycle, candidate engine
+    explore/           filters, session lifecycle, candidate engine, the run variant
+    shopping/          the list, its aisles, and how lines merge
     match/             fuzzy ingredient matching
     parse/             pasted-recipe parser
     add/               the editable draft between "parsed" and "saved"
@@ -207,6 +218,49 @@ entirely. Boosted ingredients float their recipes to the front of the shuffle.
 The recipe on screen is resolved from the collection, not from the candidate list.
 Excluding an ingredient must never yank the plate out from under you — only the
 mechanism changes what is displayed.
+
+**The numbers follow the decisions.** A caesar without the parmesan is not the same
+489 kcal, so `recipeForRun` (`lib/explore/liveRecipe.ts`) builds the variant the run
+describes — optional ingredients ruled out are gone, and a swappable slot is made of
+whichever option is actually standing in it — and the ordinary scoring pass runs over
+that. The same function decides which option a swap chain leads with as the Explore
+capsules use to decide which pill to show, so the ingredient you can see and the
+ingredient in the macros are never two different things.
+
+It is memoised on recipe identity and hands back the original object when a recipe is
+untouched, which is what keeps the analysis cache warm for the rest of the collection.
+Nothing is written down: the detail screen says when it is showing an adjusted plate
+and gives the original back in one tap, and the whole thing lasts exactly as long as
+the run does.
+
+### The shopping list
+
+A recipe sends its ingredients to the list from the detail screen, at the servings on
+screen and minus anything the run has ruled out. Pantry staples are left off — nobody
+goes shopping for the salt — using the same `basic` rule Explore uses to decide which
+ingredients are worth showing as pills.
+
+The list reads two ways because they answer different questions. **By recipe** is for
+packing a week. **By aisle** is for standing in the shop, where the recipe is
+irrelevant and two recipes both wanting kale is one thing to pick up — so lines merge,
+adding their amounts when the units agree and showing both when they do not, because
+inventing a conversion between "2 cloves" and "15 g" would be a lie.
+
+Tap crosses off, hold puts back. That is the same grammar as the Explore pills, and
+`useTapHold` is the one implementation of it. Crossing off is not deleting: the line
+goes grey and stays in place, because the commonest thing after "got it" is "no, wrong
+one".
+
+### The backlog
+
+The gap between cooking something good and having the patience to type it in. A title
+is enough to stop it being forgotten; a photo, taken while it is still on the plate,
+is enough to remember what it was. Picking an entry up later hands its title and photo
+to the editor, and the entry leaves the backlog when the recipe saves.
+
+Deliberately its own table rather than a `Recipe` with empty fields — an
+ingredient-less recipe would sit in the library scoring zero and turn up in Explore as
+something to cook tonight.
 
 ### Importing and editing
 

@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 import { spring } from '@/lib/motion';
 
 /**
- * Four destinations, no chrome. The active item is marked by a single dot rather
+ * Five destinations, no chrome. The active item is marked by a single dot rather
  * than a filled pill — the bar should read as an edge of the instrument, not a
  * navigation component sitting on top of it.
  */
@@ -15,6 +15,7 @@ const ITEMS = [
   { href: '/', label: 'Explore' },
   { href: '/library', label: 'Recipes' },
   { href: '/add', label: 'Add' },
+  { href: '/shopping', label: 'List' },
   { href: '/settings', label: 'Settings' },
 ];
 
@@ -47,10 +48,10 @@ export function TabBar() {
       <ul
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(5, 1fr)',
           listStyle: 'none',
           margin: 0,
-          padding: '10px 12px 8px',
+          padding: '10px 6px 8px',
           height: 'var(--tabbar-h)',
         }}
       >
@@ -67,13 +68,13 @@ export function TabBar() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: 6,
-                  padding: '8px 14px 4px',
-                  minWidth: 56,
+                  padding: '8px 6px 4px',
+                  minWidth: 0,
                   color: isActive ? 'var(--ink)' : 'var(--ink-30)',
                   transition: 'color 240ms ease',
                 }}
               >
-                <span style={{ fontSize: 11.5, letterSpacing: '-0.005em', fontWeight: isActive ? 400 : 300 }}>
+                <span style={{ fontSize: 11, letterSpacing: '-0.01em', fontWeight: isActive ? 400 : 300 }}>
                   {item.label}
                 </span>
                 <span style={{ height: 4, display: 'block' }}>

@@ -215,6 +215,31 @@ export interface CookLogEntry {
   updated_at: string;
 }
 
+/**
+ * Something you want to write down properly later.
+ *
+ * The gap this closes is the one between cooking a thing and having the patience to
+ * enter it. A title — and a photo, if you just made it and it is still on the plate —
+ * is enough to stop it being forgotten, and the real recipe can be written whenever.
+ *
+ * Deliberately not a `Recipe` with empty fields: an ingredient-less recipe would sit
+ * in the library scoring zero and turn up in Explore as something to cook tonight.
+ */
+export interface BacklogEntry {
+  id: string;
+  title: string;
+  note: string | null;
+  image_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewBacklogEntry = Omit<BacklogEntry, 'id' | 'created_at' | 'updated_at' | 'note' | 'image_url'> & {
+  id?: string;
+  note?: string | null;
+  image_url?: string | null;
+};
+
 /** `cooked_at` defaults to now and a note is rarely wanted, so neither is required. */
 export type NewCookLogEntry = Omit<CookLogEntry, 'id' | 'created_at' | 'updated_at' | 'cooked_at' | 'note'> & {
   id?: string;

@@ -1,13 +1,15 @@
 import type {
+  BacklogEntry,
   CookLogEntry,
   Ingredient,
+  NewBacklogEntry,
   NewCookLogEntry,
   NewIngredient,
   NewRecipe,
   Recipe,
 } from './types';
 import { newId, type Repo, type SyncState } from './adapter';
-import { mapCookLog, mapIngredient, mapRecipe } from './map';
+import { mapBacklog, mapCookLog, mapIngredient, mapRecipe } from './map';
 import { SupabaseRemote, supabaseClient } from './supabase';
 import {
   bulkDel,
@@ -54,6 +56,7 @@ const CURSOR = {
   recipes: 'sync.cursor.recipes',
   ingredients: 'sync.cursor.ingredients',
   cookLog: 'sync.cursor.cook_log',
+  backlog: 'sync.cursor.backlog',
 } as const;
 
 const LAST_SYNCED = 'sync.lastSyncedAt';
@@ -102,6 +105,11 @@ export class CloudRepo implements Repo {
   async listCookLog(): Promise<CookLogEntry[]> {
     const all = await getAll<CookLogEntry>(STORE.cookLog);
     return all.sort((a, b) => (a.cooked_at < b.cooked_at ? 1 : -1));
+  }
+
+  async listBacklog(): Promise<BacklogEntry[]> {
+    const all = await getAll<BacklogEntry>(STORE.backlog);
+    return all.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   }
 
   /* ------------------------------------------------------------------ writes */
@@ -170,6 +178,32 @@ export class CloudRepo implements Repo {
     await enqueue('cook.log', id, saved);
     void this.flush();
     return saved;
+  }
+
+  async saveBacklog(entry: NewBacklogEntry): Promise<BacklogEntry> {
+    const id = entry.id ?? newId('bl');
+    const existing = await get<BacklogEntry>(STORE.backlog, id);
+    const now = new Date().toISOString();
+
+    const saved: BacklogEntry = {
+      ...entry,
+      id,
+      note: entry.note ?? existing?.note ?? null,
+      image_url: entry.image_url ?? existing?.image_url ?? null,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    };
+
+    await put(STORE.backlog, saved);
+    await enqueue('backlog.save', id, saved);
+    void this.flush();
+    return saved;
+  }
+
+  async deleteBacklog(id: string): Promise<void> {
+    await del(STORE.backlog, id);
+    await enqueue('backlog.delete', id, null);
+    void this.flush();
   }
 
   /* ------------------------------------------------------------------ images */
@@ -270,16 +304,21 @@ export class CloudRepo implements Repo {
 
     this.emit({ phase: 'syncing', error: null });
     try {
-      const [recipeCursor, ingredientCursor, cookCursor] = await Promise.all([
+      const [recipeCursor, ingredientCursor, cookCursor, backlogCursor] = await Promise.all([
         getMeta<string>(CURSOR.recipes, EPOCH),
         getMeta<string>(CURSOR.ingredients, EPOCH),
         getMeta<string>(CURSOR.cookLog, EPOCH),
+        getMeta<string>(CURSOR.backlog, EPOCH),
       ]);
 
-      const [recipeRows, ingredientRows, cookRows] = await Promise.all([
+      const [recipeRows, ingredientRows, cookRows, backlogRows] = await Promise.all([
         remote.pullRecipes(overlap(recipeCursor)),
         remote.pullIngredients(overlap(ingredientCursor)),
         remote.pullCookLog(overlap(cookCursor)),
+        // The backlog is the newest table, so it is the one a database that has not
+        // had 0005 applied to it will be missing. Failing the whole sync over it
+        // would take the recipes down with it for the sake of a list of titles.
+        remote.pullBacklog(overlap(backlogCursor)).catch(() => []),
       ]);
 
       // an unsent local edit outranks anything the pull brings back for that record
@@ -298,6 +337,7 @@ export class CloudRepo implements Repo {
           ingredientCursor,
         ),
         this.applyPull(STORE.cookLog, cookRows, mapCookLog, held, CURSOR.cookLog, cookCursor),
+        this.applyPull(STORE.backlog, backlogRows, mapBacklog, held, CURSOR.backlog, backlogCursor),
       ]);
 
       const at = new Date().toISOString();
@@ -397,6 +437,10 @@ export class CloudRepo implements Repo {
         return remote.deleteIngredient(entry.targetId);
       case 'cook.log':
         return remote.saveCookEntry(entry.payload as CookLogEntry);
+      case 'backlog.save':
+        return remote.saveBacklogEntry(entry.payload as BacklogEntry);
+      case 'backlog.delete':
+        return remote.deleteBacklogEntry(entry.targetId);
       case 'image.upload':
         return this.sendImage(remote, entry);
     }

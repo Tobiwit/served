@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { CookLogEntry, Ingredient, Recipe } from './types';
+import type { BacklogEntry, CookLogEntry, Ingredient, Recipe } from './types';
 import { newId } from './adapter';
 
 /**
@@ -73,6 +73,10 @@ export class SupabaseRemote {
 
   pullCookLog(since: string): Promise<any[]> {
     return this.page('cook_log', '*', since);
+  }
+
+  pullBacklog(since: string): Promise<any[]> {
+    return this.page('backlog', '*', since);
   }
 
   private async page(table: string, select: string, since: string): Promise<any[]> {
@@ -233,6 +237,19 @@ export class SupabaseRemote {
     void created_at;
     void updated_at;
     const { error } = await this.db.from('cook_log').upsert({ ...row, deleted_at: null });
+    if (error) throw error;
+  }
+
+  async saveBacklogEntry(entry: BacklogEntry): Promise<void> {
+    const { created_at, updated_at, ...row } = entry as BacklogEntry & Record<string, unknown>;
+    void created_at;
+    void updated_at;
+    const { error } = await this.db.from('backlog').upsert({ ...row, deleted_at: null });
+    if (error) throw error;
+  }
+
+  async deleteBacklogEntry(id: string): Promise<void> {
+    const { error } = await this.db.from('backlog').update({ deleted_at: new Date().toISOString() }).eq('id', id);
     if (error) throw error;
   }
 

@@ -2,8 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type {
+  BacklogEntry,
   CookLogEntry,
   Ingredient,
+  NewBacklogEntry,
   NewCookLogEntry,
   NewIngredient,
   NewRecipe,
@@ -37,6 +39,8 @@ interface DataValue {
   allRecipes: Recipe[];
   ingredients: Ingredient[];
   cookLog: CookLogEntry[];
+  /** meals noted down to write up later — a title, sometimes a photo */
+  backlog: BacklogEntry[];
   ingredientIndex: Map<string, Ingredient>;
   /** most recent first, so `lastCooked.get(id)` is when a recipe was last made */
   lastCooked: Map<string, string>;
@@ -46,6 +50,8 @@ interface DataValue {
   saveIngredient: (i: NewIngredient) => Promise<Ingredient>;
   deleteIngredient: (id: string) => Promise<void>;
   logCooked: (entry: NewCookLogEntry) => Promise<CookLogEntry>;
+  saveBacklog: (entry: NewBacklogEntry) => Promise<BacklogEntry>;
+  deleteBacklog: (id: string) => Promise<void>;
   sync: SyncState;
   syncNow: () => Promise<void>;
   refreshFromCloud: () => Promise<void>;
@@ -63,6 +69,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [hideSeeded, setHide] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [cookLog, setCookLog] = useState<CookLogEntry[]>([]);
+  const [backlog, setBacklog] = useState<BacklogEntry[]>([]);
   const [ready, setReady] = useState(false);
   const repo = getRepo();
 
@@ -72,11 +79,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   /** Re-read the mirror. Called after a sync, which is the only thing that changes
    *  records behind the interface's back. Reports whether it found anything. */
   const reload = useCallback(async () => {
-    const [r, i, c] = await Promise.all([repo.listRecipes(), repo.listIngredients(), repo.listCookLog()]);
+    const [r, i, c, b] = await Promise.all([
+      repo.listRecipes(),
+      repo.listIngredients(),
+      repo.listCookLog(),
+      repo.listBacklog(),
+    ]);
     if (!alive.current) return false;
     setRecipes(r);
     setIngredients(i);
     setCookLog(c);
+    setBacklog(b);
     return r.length > 0 || i.length > 0;
   }, [repo]);
 
@@ -231,6 +244,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [repo],
   );
 
+  const saveBacklog = useCallback(
+    async (entry: NewBacklogEntry) => {
+      const saved = await repo.saveBacklog(entry);
+      setBacklog((prev) => {
+        const i = prev.findIndex((x) => x.id === saved.id);
+        return i >= 0 ? prev.map((x) => (x.id === saved.id ? saved : x)) : [saved, ...prev];
+      });
+      return saved;
+    },
+    [repo],
+  );
+
+  const deleteBacklog = useCallback(
+    async (id: string) => {
+      await repo.deleteBacklog(id);
+      setBacklog((prev) => prev.filter((b) => b.id !== id));
+    },
+    [repo],
+  );
+
   const refreshFromCloud = useCallback(async () => {
     await repo.refreshFromCloud();
     await reload();
@@ -243,6 +276,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       allRecipes: recipes,
       ingredients,
       cookLog,
+      backlog,
       ingredientIndex,
       lastCooked,
       analysisFor,
@@ -251,6 +285,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       saveIngredient,
       deleteIngredient,
       logCooked,
+      saveBacklog,
+      deleteBacklog,
       sync,
       syncNow,
       refreshFromCloud,
@@ -263,6 +299,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       recipes,
       ingredients,
       cookLog,
+      backlog,
       ingredientIndex,
       lastCooked,
       analysisFor,
@@ -271,6 +308,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       saveIngredient,
       deleteIngredient,
       logCooked,
+      saveBacklog,
+      deleteBacklog,
       sync,
       syncNow,
       refreshFromCloud,

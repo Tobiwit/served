@@ -5,6 +5,7 @@ import { AuthProvider } from '@/lib/auth/AuthProvider';
 import { AuthGate } from '@/components/auth/AuthGate';
 import { DataProvider } from '@/lib/store/DataProvider';
 import { ExploreProvider } from '@/lib/store/ExploreProvider';
+import { ShoppingProvider } from '@/lib/store/ShoppingProvider';
 import { ServiceWorker } from '@/components/shell/ServiceWorker';
 import { TabBar } from '@/components/shell/TabBar';
 import { MotionConfig } from 'motion/react';
@@ -48,8 +49,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthGate>
               <DataProvider>
                 <ExploreProvider>
-                  {children}
-                  <TabBar />
+                  <ShoppingProvider>
+                    {children}
+                    <TabBar />
+                  </ShoppingProvider>
                 </ExploreProvider>
               </DataProvider>
             </AuthGate>

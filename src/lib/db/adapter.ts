@@ -1,6 +1,8 @@
 import type {
+  BacklogEntry,
   CookLogEntry,
   Ingredient,
+  NewBacklogEntry,
   NewCookLogEntry,
   NewIngredient,
   NewRecipe,
@@ -24,6 +26,9 @@ export interface Repo {
   deleteIngredient(id: string): Promise<void>;
   listCookLog(): Promise<CookLogEntry[]>;
   logCooked(entry: NewCookLogEntry): Promise<CookLogEntry>;
+  listBacklog(): Promise<BacklogEntry[]>;
+  saveBacklog(entry: NewBacklogEntry): Promise<BacklogEntry>;
+  deleteBacklog(id: string): Promise<void>;
 }
 
 /** How the sync loop describes itself to the interface. */

@@ -15,6 +15,8 @@ export type OutboxKind =
   | 'ingredient.save'
   | 'ingredient.delete'
   | 'cook.log'
+  | 'backlog.save'
+  | 'backlog.delete'
   | 'image.upload';
 
 export interface OutboxEntry<T = unknown> {
@@ -32,12 +34,13 @@ export interface OutboxEntry<T = unknown> {
 }
 
 /** A save carries the whole record, so an earlier one is pure waste. */
-const COALESCING: OutboxKind[] = ['recipe.save', 'ingredient.save'];
+const COALESCING: OutboxKind[] = ['recipe.save', 'ingredient.save', 'backlog.save'];
 
 /** Deleting supersedes anything still queued for that record. */
 const SUPERSEDED_BY_DELETE: Record<string, OutboxKind[]> = {
   'recipe.delete': ['recipe.save', 'image.upload'],
   'ingredient.delete': ['ingredient.save'],
+  'backlog.delete': ['backlog.save', 'image.upload'],
 };
 
 type Listener = () => void;

@@ -6,6 +6,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
 import { buildCandidates, evaluate, exploreIngredients, optionIds, pickNext, type Candidate } from '@/lib/explore/candidates';
+import { recipeForRun, runState, slotOptions } from '@/lib/explore/liveRecipe';
+import type { Recipe } from '@/lib/db/types';
 import { RecipePlate } from '@/components/explore/RecipePlate';
 import { IngredientCapsule, type CapsuleOption } from '@/components/explore/IngredientCapsule';
 import { Mechanism, MECHANISM_MS } from '@/components/explore/Mechanism';
@@ -27,14 +29,25 @@ export default function ExplorePage() {
   const [toast, setToast] = useState<{ message: string; undo?: () => void } | null>(null);
   const toastTimer = useRef<number | null>(null);
 
-  const excluded = useMemo(() => new Set(session.excluded), [session.excluded]);
-  const boosted = useMemo(() => new Set(session.boosted), [session.boosted]);
+  const run = useMemo(() => runState(session.excluded, session.boosted), [session.excluded, session.boosted]);
+  const { excluded, boosted } = run;
   const seen = useMemo(() => new Set(session.seen), [session.seen]);
+
+  /**
+   * Scores read off the plate as this run has left it, not as the recipe was
+   * written — so ruling out the parmesan moves the numbers, here and on the detail
+   * screen. `recipeForRun` hands back the same object when a recipe is untouched,
+   * which is what keeps the analysis cache warm for the rest of the collection.
+   */
+  const runAnalysis = useCallback(
+    (r: Recipe) => analysisFor(recipeForRun(r, run, ingredientIndex)),
+    [analysisFor, run, ingredientIndex],
+  );
 
   /** Everything still available to move to. Does not include what is on screen. */
   const candidates = useMemo(
-    () => buildCandidates(recipes, analysisFor, session.filters, excluded, boosted, seen),
-    [recipes, analysisFor, session.filters, excluded, boosted, seen],
+    () => buildCandidates(recipes, runAnalysis, session.filters, excluded, boosted, seen),
+    [recipes, runAnalysis, session.filters, excluded, boosted, seen],
   );
 
   /**
@@ -46,9 +59,11 @@ export default function ExplorePage() {
     if (!session.current) return null;
     const recipe = recipes.find((r) => r.id === session.current);
     if (!recipe) return null;
-    const c = evaluate(recipe, analysisFor(recipe), excluded, boosted);
-    return c ?? { recipe, analysis: analysisFor(recipe), swaps: [], boostHits: 0 };
-  }, [session.current, recipes, analysisFor, excluded, boosted]);
+    // evaluate reads the recipe as written — survival is decided by the roles it
+    // was saved with — while the analysis it carries is the adjusted one
+    const c = evaluate(recipe, runAnalysis(recipe), excluded, boosted);
+    return c ?? { recipe, analysis: runAnalysis(recipe), swaps: [], boostHits: 0 };
+  }, [session.current, recipes, runAnalysis, excluded, boosted]);
 
   const candidatesRef = useRef(candidates);
   const currentIdRef = useRef<string | null>(null);
@@ -140,10 +155,9 @@ export default function ExplorePage() {
         }
 
         const isGroup = ri.role === 'substitutable' && ids.length > 1;
-        // stable, so anything unboosted keeps the order the recipe wrote it in
-        const pool = isGroup
-          ? [...ids].sort((a, b) => Number(boosted.has(b)) - Number(boosted.has(a)))
-          : ids.slice(0, 1);
+        // the same ordering the macros are counted from, so the pill leading the
+        // chain and the ingredient in the numbers are never two different things
+        const pool = slotOptions(ri, boosted);
 
         const revealed: CapsuleOption[] = [];
         for (const id of pool) {
