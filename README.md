@@ -74,6 +74,8 @@ carrying one.
 | Favourites, cooked history | cloud + mirror |
 | Photos | Supabase Storage, cached by the service worker |
 | Backlog — meals noted to write up later | cloud + mirror |
+| Tracker food log — meals and activities per day (`0006_food_log.sql`) | cloud + mirror |
+| Tracker goals — calories and macros | local only |
 | Explore filters, popped ingredients, recipes seen this run | local only |
 | The shopping list | local only |
 | Last open screen | local only |

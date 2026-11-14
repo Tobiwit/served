@@ -246,3 +246,71 @@ export type NewCookLogEntry = Omit<CookLogEntry, 'id' | 'created_at' | 'updated_
   cooked_at?: string;
   note?: string | null;
 };
+
+/* ------------------------------------------------------------------- tracker */
+
+/**
+ * When in the day something was eaten. Not the recipe's course — a coffee is not a
+ * course, and the same bowl is lunch one day and the post-gym meal the next. These
+ * are what colour the segments of the tracker's bar.
+ */
+export type MealSlot = 'breakfast' | 'coffee' | 'lunch' | 'snack' | 'dinner' | 'postgym';
+
+export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'coffee', 'lunch', 'snack', 'dinner', 'postgym'];
+
+export const MEAL_SLOT_LABEL: Record<MealSlot, string> = {
+  breakfast: 'Breakfast',
+  coffee: 'Coffee',
+  lunch: 'Lunch',
+  snack: 'Snack',
+  dinner: 'Dinner',
+  postgym: 'Post-gym',
+};
+
+/** One weighed line of a logged meal, frozen at the values it was logged with. */
+export interface FoodLogItem {
+  name: string;
+  ingredient_id: string | null;
+  amount: number | null;
+  unit: string | null;
+  grams: number | null;
+  kcal: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+}
+
+/**
+ * One thing on the day's tracker: a meal eaten, or an activity that earned room.
+ *
+ * Totals are stored, not derived. Editing an ingredient's nutrition next month must
+ * not quietly rewrite what was eaten today — the log is a record of what was counted
+ * at the time, and `items` keeps the working.
+ *
+ * An activity carries its kcal as a positive number: it widens the day's budget
+ * rather than being eaten from it.
+ */
+export interface FoodLogEntry {
+  id: string;
+  /** the local calendar day it counts towards, YYYY-MM-DD */
+  day: string;
+  kind: 'food' | 'activity';
+  slot: MealSlot | null;
+  label: string;
+  kcal: number;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  source: 'transcript' | 'log' | 'recipe' | 'activity';
+  recipe_id: string | null;
+  servings: number | null;
+  items: FoodLogItem[];
+  logged_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type NewFoodLogEntry = Omit<FoodLogEntry, 'id' | 'created_at' | 'updated_at' | 'logged_at'> & {
+  id?: string;
+  logged_at?: string;
+};

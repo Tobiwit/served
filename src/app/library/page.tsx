@@ -76,13 +76,40 @@ export default function LibraryPage() {
 
   return (
     <main className="screen" style={{ paddingTop: 'calc(var(--safe-t) + 26px)' }}>
-      <header style={{ marginBottom: 18 }}>
-        <h1 className="t-display" style={{ margin: 0 }}>
-          Recipes
-        </h1>
-        <p className="t-micro t-dim" style={{ margin: '8px 0 0' }}>
-          {ready ? `${recipes.length} in the collection` : 'Reading the shelf…'}
-        </p>
+      <header style={{ marginBottom: 18, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h1 className="t-display" style={{ margin: 0 }}>
+            Recipes
+          </h1>
+          <p className="t-micro t-dim" style={{ margin: '8px 0 0' }}>
+            {ready ? `${recipes.length} in the collection` : 'Reading the shelf…'}
+          </p>
+        </div>
+        {/* adding lives here now rather than in the tab bar — it is something you do
+            to the collection, not a place you go */}
+        <Link
+          href="/add"
+          aria-label="Add a recipe"
+          style={{
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 2,
+            padding: '9px 15px 9px 12px',
+            borderRadius: 'var(--r-pill)',
+            background: 'var(--ink)',
+            color: '#fff',
+            fontSize: 13.5,
+            fontWeight: 300,
+            boxShadow: 'var(--lift-2)',
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 13 13" aria-hidden>
+            <path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+          Add
+        </Link>
       </header>
 
       <div className="surface hairline" style={{ borderRadius: 'var(--r-pill)', padding: '11px 16px', display: 'flex', gap: 10 }}>

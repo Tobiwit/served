@@ -9,14 +9,15 @@
  */
 
 const DB_NAME = 'served';
-// 2 added the backlog store
-const DB_VERSION = 2;
+// 2 added the backlog store, 3 the tracker's food log
+const DB_VERSION = 3;
 
 export const STORE = {
   recipes: 'recipes',
   ingredients: 'ingredients',
   cookLog: 'cook_log',
   backlog: 'backlog',
+  foodLog: 'food_log',
   outbox: 'outbox',
   blobs: 'blobs',
   meta: 'meta',
@@ -41,7 +42,7 @@ function openDb(): Promise<IDBDatabase> {
       const db = request.result;
       // records keyed by their own id — the same ids the cloud uses, so a pulled
       // row overwrites its local copy without any reconciliation step
-      for (const name of [STORE.recipes, STORE.ingredients, STORE.cookLog, STORE.backlog, STORE.blobs]) {
+      for (const name of [STORE.recipes, STORE.ingredients, STORE.cookLog, STORE.backlog, STORE.foodLog, STORE.blobs]) {
         if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(STORE.outbox)) {
@@ -172,6 +173,7 @@ export async function clearMirror(): Promise<void> {
     clearStore(STORE.ingredients),
     clearStore(STORE.cookLog),
     clearStore(STORE.backlog),
+    clearStore(STORE.foodLog),
     clearStore(STORE.meta),
   ]);
 }

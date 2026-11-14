@@ -1,9 +1,11 @@
 import type {
   BacklogEntry,
   CookLogEntry,
+  FoodLogEntry,
   Ingredient,
   NewBacklogEntry,
   NewCookLogEntry,
+  NewFoodLogEntry,
   NewIngredient,
   NewRecipe,
   Recipe,
@@ -29,6 +31,9 @@ export interface Repo {
   listBacklog(): Promise<BacklogEntry[]>;
   saveBacklog(entry: NewBacklogEntry): Promise<BacklogEntry>;
   deleteBacklog(id: string): Promise<void>;
+  listFoodLog(): Promise<FoodLogEntry[]>;
+  saveFoodLog(entry: NewFoodLogEntry): Promise<FoodLogEntry>;
+  deleteFoodLog(id: string): Promise<void>;
 }
 
 /** How the sync loop describes itself to the interface. */

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { BacklogEntry, CookLogEntry, Ingredient, Recipe, RecipeIngredient } from './types';
+import type { BacklogEntry, CookLogEntry, FoodLogEntry, Ingredient, Recipe, RecipeIngredient } from './types';
 import { normalizeCourse } from './types';
 
 /**
@@ -85,6 +85,34 @@ export function mapBacklog(row: any): BacklogEntry {
     title: row.title,
     note: row.note ?? null,
     image_url: row.image_url ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+/** PostgREST can hand `numeric` back as a string; the tracker does sums on these. */
+function num(v: any): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export function mapFoodLog(row: any): FoodLogEntry {
+  return {
+    id: row.id,
+    day: String(row.day).slice(0, 10),
+    kind: row.kind === 'activity' ? 'activity' : 'food',
+    slot: row.slot ?? null,
+    label: row.label ?? '',
+    kcal: num(row.kcal) ?? 0,
+    protein: num(row.protein),
+    carbs: num(row.carbs),
+    fat: num(row.fat),
+    source: row.source,
+    recipe_id: row.recipe_id ?? null,
+    servings: num(row.servings),
+    items: Array.isArray(row.items) ? row.items : [],
+    logged_at: row.logged_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

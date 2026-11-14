@@ -1,15 +1,17 @@
 import type {
   BacklogEntry,
   CookLogEntry,
+  FoodLogEntry,
   Ingredient,
   NewBacklogEntry,
   NewCookLogEntry,
+  NewFoodLogEntry,
   NewIngredient,
   NewRecipe,
   Recipe,
 } from './types';
 import { newId, type Repo, type SyncState } from './adapter';
-import { mapBacklog, mapCookLog, mapIngredient, mapRecipe } from './map';
+import { mapBacklog, mapCookLog, mapFoodLog, mapIngredient, mapRecipe } from './map';
 import { SupabaseRemote, supabaseClient } from './supabase';
 import {
   bulkDel,
@@ -57,6 +59,7 @@ const CURSOR = {
   ingredients: 'sync.cursor.ingredients',
   cookLog: 'sync.cursor.cook_log',
   backlog: 'sync.cursor.backlog',
+  foodLog: 'sync.cursor.food_log',
 } as const;
 
 const LAST_SYNCED = 'sync.lastSyncedAt';
@@ -110,6 +113,11 @@ export class CloudRepo implements Repo {
   async listBacklog(): Promise<BacklogEntry[]> {
     const all = await getAll<BacklogEntry>(STORE.backlog);
     return all.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  }
+
+  async listFoodLog(): Promise<FoodLogEntry[]> {
+    const all = await getAll<FoodLogEntry>(STORE.foodLog);
+    return all.sort((a, b) => (a.logged_at < b.logged_at ? -1 : 1));
   }
 
   /* ------------------------------------------------------------------ writes */
@@ -203,6 +211,31 @@ export class CloudRepo implements Repo {
   async deleteBacklog(id: string): Promise<void> {
     await del(STORE.backlog, id);
     await enqueue('backlog.delete', id, null);
+    void this.flush();
+  }
+
+  async saveFoodLog(entry: NewFoodLogEntry): Promise<FoodLogEntry> {
+    const id = entry.id ?? newId('food');
+    const existing = await get<FoodLogEntry>(STORE.foodLog, id);
+    const now = new Date().toISOString();
+
+    const saved: FoodLogEntry = {
+      ...entry,
+      id,
+      logged_at: entry.logged_at ?? existing?.logged_at ?? now,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    };
+
+    await put(STORE.foodLog, saved);
+    await enqueue('food.save', id, saved);
+    void this.flush();
+    return saved;
+  }
+
+  async deleteFoodLog(id: string): Promise<void> {
+    await del(STORE.foodLog, id);
+    await enqueue('food.delete', id, null);
     void this.flush();
   }
 
@@ -304,14 +337,15 @@ export class CloudRepo implements Repo {
 
     this.emit({ phase: 'syncing', error: null });
     try {
-      const [recipeCursor, ingredientCursor, cookCursor, backlogCursor] = await Promise.all([
+      const [recipeCursor, ingredientCursor, cookCursor, backlogCursor, foodCursor] = await Promise.all([
         getMeta<string>(CURSOR.recipes, EPOCH),
         getMeta<string>(CURSOR.ingredients, EPOCH),
         getMeta<string>(CURSOR.cookLog, EPOCH),
         getMeta<string>(CURSOR.backlog, EPOCH),
+        getMeta<string>(CURSOR.foodLog, EPOCH),
       ]);
 
-      const [recipeRows, ingredientRows, cookRows, backlogRows] = await Promise.all([
+      const [recipeRows, ingredientRows, cookRows, backlogRows, foodRows] = await Promise.all([
         remote.pullRecipes(overlap(recipeCursor)),
         remote.pullIngredients(overlap(ingredientCursor)),
         remote.pullCookLog(overlap(cookCursor)),
@@ -319,6 +353,8 @@ export class CloudRepo implements Repo {
         // had 0005 applied to it will be missing. Failing the whole sync over it
         // would take the recipes down with it for the sake of a list of titles.
         remote.pullBacklog(overlap(backlogCursor)).catch(() => []),
+        // the food log is newer still and needs 0006 — same reasoning
+        remote.pullFoodLog(overlap(foodCursor)).catch(() => []),
       ]);
 
       // an unsent local edit outranks anything the pull brings back for that record
@@ -338,6 +374,7 @@ export class CloudRepo implements Repo {
         ),
         this.applyPull(STORE.cookLog, cookRows, mapCookLog, held, CURSOR.cookLog, cookCursor),
         this.applyPull(STORE.backlog, backlogRows, mapBacklog, held, CURSOR.backlog, backlogCursor),
+        this.applyPull(STORE.foodLog, foodRows, mapFoodLog, held, CURSOR.foodLog, foodCursor),
       ]);
 
       const at = new Date().toISOString();
@@ -441,6 +478,10 @@ export class CloudRepo implements Repo {
         return remote.saveBacklogEntry(entry.payload as BacklogEntry);
       case 'backlog.delete':
         return remote.deleteBacklogEntry(entry.targetId);
+      case 'food.save':
+        return remote.saveFoodLogEntry(entry.payload as FoodLogEntry);
+      case 'food.delete':
+        return remote.deleteFoodLogEntry(entry.targetId);
       case 'image.upload':
         return this.sendImage(remote, entry);
     }

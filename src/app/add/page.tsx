@@ -66,6 +66,9 @@ export default function AddPage() {
     return (
       <main className="screen" style={{ paddingTop: 'calc(var(--safe-t) + 26px)' }}>
         <header style={{ marginBottom: 20 }}>
+          <button type="button" onClick={() => router.push('/library')} className="t-micro t-dim" style={{ marginBottom: 14 }}>
+            ← Recipes
+          </button>
           <h1 className="t-display" style={{ margin: 0 }}>
             Add a recipe
           </h1>
