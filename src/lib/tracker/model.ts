@@ -223,3 +223,25 @@ export function bandsFor(t: DayTotals, goals: Goals): BarLayout {
 export function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
+
+/* ---------------------------------------------------------------- macro focus */
+
+export type MacroFocus = 'protein' | 'carbs' | 'fat';
+
+export const MACRO_LABEL: Record<MacroFocus, string> = { protein: 'protein', carbs: 'carbs', fat: 'fat' };
+
+/** The colour field each macro lights in — the same as its panel beside the bar. */
+export const MACRO_TONE: Record<MacroFocus, Tone> = { protein: 'protein', carbs: 'calories', fat: 'time' };
+
+const KCAL_PER_G: Record<MacroFocus, number> = { protein: 4, carbs: 4, fat: 9 };
+
+/**
+ * How much of a meal's energy came from one macro, 0..1 — or null when the meal was
+ * logged without that macro, which is unknown rather than none. Clamped because
+ * the 4/4/9 factors are approximations and rounded labels can add up past 100%.
+ */
+export function macroShare(entry: FoodLogEntry, macro: MacroFocus): number | null {
+  const g = entry[macro];
+  if (g == null || !(entry.kcal > 0)) return null;
+  return Math.max(0, Math.min(1, (g * KCAL_PER_G[macro]) / entry.kcal));
+}

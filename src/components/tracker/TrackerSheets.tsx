@@ -148,10 +148,10 @@ export function RecipeLogSheet({
               <div className="t-micro t-dim">Servings</div>
               <div style={{ fontSize: 30, fontWeight: 200, letterSpacing: '-0.03em', lineHeight: 1.1 }}>{formatAmount(servings, null)}</div>
             </div>
-            <Stepper onClick={() => setServings((s) => Math.max(0.5, s - 0.5))} label="Less">
+            <Stepper onClick={() => setServings(lessServings)} label="Less" disabled={servings <= SMALL_PORTIONS[0]}>
               −
             </Stepper>
-            <Stepper onClick={() => setServings((s) => Math.min(10, s + 0.5))} label="More">
+            <Stepper onClick={() => setServings(moreServings)} label="More" disabled={servings >= MAX_SERVINGS}>
               +
             </Stepper>
           </div>
@@ -174,13 +174,51 @@ export function RecipeLogSheet({
   );
 }
 
-function Stepper({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label: string }) {
+/**
+ * Portions step by halves from one upwards, but below one they follow the fractions
+ * a plate actually gets split into: half, then a third, then a quarter.
+ */
+const SMALL_PORTIONS = [1 / 4, 1 / 3, 1 / 2, 1];
+const MAX_SERVINGS = 10;
+
+function lessServings(s: number): number {
+  if (s > 1) return Math.max(1, s - 0.5);
+  const below = SMALL_PORTIONS.filter((p) => p < s - 1e-6);
+  return below.length ? below[below.length - 1] : s;
+}
+
+function moreServings(s: number): number {
+  if (s >= 1) return Math.min(MAX_SERVINGS, s + 0.5);
+  return SMALL_PORTIONS.find((p) => p > s + 1e-6) ?? 1;
+}
+
+function Stepper({
+  children,
+  onClick,
+  label,
+  disabled,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--ink-04)', fontSize: 20, fontWeight: 200 }}
+      disabled={disabled}
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: '50%',
+        background: 'var(--ink-04)',
+        fontSize: 20,
+        fontWeight: 200,
+        opacity: disabled ? 0.35 : 1,
+        transition: 'opacity 200ms ease',
+      }}
     >
       {children}
     </button>
@@ -207,7 +245,7 @@ export function EntrySheet({ entry, onClose }: { entry: FoodLogEntry | null; onC
             <span style={{ width: 10, height: 10, borderRadius: 3, background: color }} />
             <span className="t-micro t-dim">
               {activity ? 'Activity' : entry.slot ? MEAL_SLOT_LABEL[entry.slot] : 'Food'} · {time}
-              {entry.servings ? ` · ${formatAmount(entry.servings, null)} serving${entry.servings === 1 ? '' : 's'}` : ''}
+              {entry.servings ? ` · ${formatAmount(entry.servings, null)} serving${entry.servings <= 1 ? '' : 's'}` : ''}
             </span>
           </div>
 

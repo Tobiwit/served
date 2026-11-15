@@ -17,6 +17,7 @@ import { DottedNumber } from '@/components/instrument/DottedNumber';
 import {
   ACTIVITY_PRESETS,
   DEFAULT_GOALS,
+  MACRO_TONE,
   SLOT_TONE,
   bandsFor,
   dayKey,
@@ -26,6 +27,7 @@ import {
   shiftDay,
   totalsFor,
   type Goals,
+  type MacroFocus,
 } from '@/lib/tracker/model';
 import { QUICKLINKS, planQuick, quickCaption, type QuickItem, type Quicklink } from '@/lib/tracker/quick';
 import { ease, spring } from '@/lib/motion';
@@ -91,6 +93,8 @@ export default function TrackerPage() {
   const [recipeSlot, setRecipeSlot] = useState<MealSlot | null>(null);
   const [selected, setSelected] = useState<FoodLogEntry | null>(null);
   const [goalsOpen, setGoalsOpen] = useState(false);
+  /** the macro panel being held down — the bar shows each meal's share of it */
+  const [focus, setFocus] = useState<MacroFocus | null>(null);
   const [quickSetup, setQuickSetup] = useState<{ q: Quicklink; item: QuickItem } | null>(null);
   const [toast, setToast] = useState<{ message: string; actionLabel?: string; action?: () => void } | null>(null);
   const toastTimer = useRef<number | null>(null);
@@ -238,7 +242,7 @@ export default function TrackerPage() {
         }}
       >
         <div style={{ minHeight: 0, opacity: ready ? 1 : 0.5, transition: 'opacity 300ms ease' }}>
-          <CalorieBar key={day} layout={bands} onSelect={setSelected} />
+          <CalorieBar key={day} layout={bands} focus={focus} onSelect={setSelected} />
         </div>
 
         {/* the readouts step aside while the menu is open — the ring opens over
@@ -258,9 +262,16 @@ export default function TrackerPage() {
           </div>
 
           <div style={{ minHeight: 0, display: 'grid', gridTemplateRows: '1fr 1fr 1fr', gap: 9 }}>
-            <MacroPanel label="Protein" value={totals.protein} goal={goals.protein} tone="protein" />
-            <MacroPanel label="Carbs" value={totals.carbs} goal={goals.carbs} tone="calories" />
-            <MacroPanel label="Fat" value={totals.fat} goal={goals.fat} tone="time" />
+            {(['protein', 'carbs', 'fat'] as MacroFocus[]).map((m) => (
+              <MacroPanel
+                key={m}
+                macro={m}
+                value={totals[m]}
+                goal={goals[m]}
+                focus={focus}
+                onFocus={setFocus}
+              />
+            ))}
           </div>
         </motion.div>
 
@@ -463,12 +474,86 @@ function BudgetDots({ eaten, budget }: { eaten: number; budget: number }) {
  * A macro against its goal. Idle (nothing eaten yet) it is a white card like an
  * unengaged filter; the colour field comes up under the glass once it counts.
  */
-function MacroPanel({ label, value, goal, tone }: { label: string; value: number; goal: number; tone: Tone }) {
+const MACRO_TITLE: Record<MacroFocus, string> = { protein: 'Protein', carbs: 'Carbs', fat: 'Fat' };
+
+/** How long a press must last before it counts as a hold, so a brush does not flash the bar. */
+const HOLD_MS = 150;
+
+/**
+ * Press and hold: on while the finger is down, off the moment it lifts. Pointer
+ * capture keeps the hold alive if the finger drifts off the panel, and the browser's
+ * own long-press behaviours — the callout, text selection — are switched off.
+ */
+function useHoldFocus(macro: MacroFocus, onFocus: (m: MacroFocus | null) => void) {
+  const timer = useRef<number | null>(null);
+  const end = () => {
+    if (timer.current) window.clearTimeout(timer.current);
+    timer.current = null;
+    onFocus(null);
+  };
+  useEffect(() => () => void (timer.current && window.clearTimeout(timer.current)), []);
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        /* no capture — the hold still ends on pointerup */
+      }
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate?.(8);
+        onFocus(macro);
+      }, HOLD_MS);
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+    onLostPointerCapture: end,
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  };
+}
+
+/**
+ * A macro against its goal. Idle (nothing eaten yet) it is a white card like an
+ * unengaged filter; the colour field comes up under the glass once it counts.
+ * Hold it to see, on the bar, how much of each meal it made up.
+ */
+function MacroPanel({
+  macro,
+  value,
+  goal,
+  focus,
+  onFocus,
+}: {
+  macro: MacroFocus;
+  value: number;
+  goal: number;
+  focus: MacroFocus | null;
+  onFocus: (m: MacroFocus | null) => void;
+}) {
+  const label = MACRO_TITLE[macro];
+  const tone = MACRO_TONE[macro];
   const active = value > 0;
+  const held = focus === macro;
+  const hold = useHoldFocus(macro, onFocus);
   const N = 14;
   const share = goal > 0 ? value / goal : 0;
   const lit = Math.min(N, share * N);
   return (
+    <motion.div
+      {...hold}
+      aria-label={`${label} — hold to see each meal's share`}
+      animate={{ scale: held ? 0.97 : 1, opacity: focus && !held ? 0.45 : 1 }}
+      transition={spring.dial}
+      style={{
+        minHeight: 0,
+        display: 'grid',
+        cursor: 'pointer',
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+      }}
+    >
     <Squircle
       radius={24}
       stroke={active ? 'lume' : 'ink'}
@@ -524,6 +609,7 @@ function MacroPanel({ label, value, goal, tone }: { label: string; value: number
         })}
       </div>
     </Squircle>
+    </motion.div>
   );
 }
 
