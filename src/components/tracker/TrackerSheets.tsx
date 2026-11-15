@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { FoodLogEntry, MealSlot, Recipe } from '@/lib/db/types';
+import type { FoodLogEntry, Ingredient, MealSlot, Recipe } from '@/lib/db/types';
 import { MEAL_SLOT_LABEL } from '@/lib/db/types';
 import { useData } from '@/lib/store/DataProvider';
 import { Sheet } from '@/components/add/Sheet';
+import { NewIngredientForm } from '@/components/add/NewIngredientForm';
+import type { QuickItem } from '@/lib/tracker/quick';
 import { PrimaryButton } from './FoodComposer';
 import { normalize } from '@/lib/match/fuzzy';
 import { formatAmount } from '@/lib/nutrition/units';
@@ -363,6 +365,50 @@ export function GoalsSheet({
           Save goals
         </PrimaryButton>
       </div>
+    </Sheet>
+  );
+}
+
+/* ================================================================ quick setup */
+
+/**
+ * A quicklink whose ingredient has never been stored. Asked once: the ingredient is
+ * saved with every name the quicklink knows it by, so the next tap just logs.
+ */
+export function QuickIngredientSheet({
+  item,
+  quickLabel,
+  onCreated,
+  onClose,
+}: {
+  item: QuickItem | null;
+  quickLabel: string;
+  onCreated: (ingredient: Ingredient) => void;
+  onClose: () => void;
+}) {
+  const { saveIngredient } = useData();
+  return (
+    <Sheet open={item !== null} title={item?.name ?? ''} onClose={onClose}>
+      {item && (
+        <div>
+          <p className="t-body" style={{ margin: '0 0 4px' }}>
+            Not in your ingredients yet.
+          </p>
+          <p className="t-micro t-dim-2" style={{ margin: '0 0 14px' }}>
+            Fill it in once — {quickLabel} logs straight after, and every tap from then on is instant.
+          </p>
+          <NewIngredientForm
+            initialName={item.name}
+            onCreate={async (i) => {
+              const known = new Set(i.aliases.map((a) => a.toLowerCase()));
+              const aliases = [...i.aliases, ...item.match.filter((m) => !known.has(m) && m !== i.name.toLowerCase())];
+              const saved = await saveIngredient({ ...i, aliases });
+              onCreated(saved);
+            }}
+            onSkip={onClose}
+          />
+        </div>
+      )}
     </Sheet>
   );
 }

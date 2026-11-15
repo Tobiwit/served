@@ -3,223 +3,281 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import type { FoodLogEntry } from '@/lib/db/types';
-import { SEGMENT_KCAL, type Band } from '@/lib/tracker/model';
+import { GradientField } from '@/components/glass/GradientField';
+import { Squircle } from '@/components/glass/Squircle';
+import type { Band, BarLayout } from '@/lib/tracker/model';
 import { ease } from '@/lib/motion';
 
 /**
- * The day as a column of 50 kcal cells.
+ * The day as a column of 50 kcal cells, with what filled them written alongside.
  *
- * Food fills from the floor in the order it was eaten, each meal in the colour of
- * its part of the day, so the column reads as a record of the day as well as a
- * gauge. Cells above the goal that an activity earned sit dashed and green until
- * food reaches them. Anything past the budget lights with a coral ring.
+ *   Oats        ▕ ◖████◗
+ *   379 kcal    ▕ ◖████◗
+ *               ▕ ◖████◗
  *
- * A meal rarely ends on a 50 kcal boundary, so a cell can hold the tail of one meal
- * and the start of the next: each cell paints the slices of whatever bands overlap
- * it, rather than rounding a meal to whole cells and lying about the total.
+ * The column is built like the Explore panels: a squircle plate, and colour that is
+ * light under glass rather than paint. Each meal is a full gradient field — the same
+ * tones the filters light up in — seen only through the pill cells it covers, via a
+ * mask cut from the cell layout, so a meal reads as one wash of colour running
+ * across the gaps. Meals always light whole cells (see `bandsFor`).
+ *
+ * Labels live in their own column to the left, each tied to its meal by a bracket in
+ * the meal's colour. When meals are too short to hold a label each, the labels are
+ * spread apart and a leader line runs back to the bracket they belong to.
  */
 
 const GAP = 3;
+const PAD = 8;
+/** vertical room one label needs: a name and a kcal line */
+const LABEL_H = 30;
+/** the strip between the labels and the bar that holds brackets and leaders */
+const RAIL = 14;
 
-export function CalorieBar({
-  food,
-  activity,
-  capacity,
-  goal,
-  budget,
-  onSelect,
-}: {
-  food: Band[];
-  activity: Band[];
-  capacity: number;
-  goal: number;
-  budget: number;
-  onSelect: (entry: FoodLogEntry) => void;
-}) {
+export function CalorieBar({ layout, onSelect }: { layout: BarLayout; onSelect: (entry: FoodLogEntry) => void }) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState(0);
+  const [box, setBox] = useState({ w: 0, h: 0 });
   useLayoutEffect(() => {
     const node = ref.current;
     if (!node) return;
-    const ro = new ResizeObserver(([e]) => setHeight(e.contentRect.height));
+    const read = () => {
+      const r = node.getBoundingClientRect();
+      setBox((p) => (Math.abs(p.w - r.width) < 0.5 && Math.abs(p.h - r.height) < 0.5 ? p : { w: r.width, h: r.height }));
+    };
+    const ro = new ResizeObserver(read);
     ro.observe(node);
-    setHeight(node.getBoundingClientRect().height);
+    read();
     return () => ro.disconnect();
   }, []);
-  const count = capacity / SEGMENT_KCAL;
-  const eaten = food.length ? food[food.length - 1].to : 0;
 
-  const cells = useMemo(() => {
-    return Array.from({ length: count }, (_, i) => {
-      const lo = i * SEGMENT_KCAL;
-      const hi = lo + SEGMENT_KCAL;
-      const slices = food
-        .filter((b) => b.to > lo && b.from < hi)
-        .map((b) => ({
-          id: b.entry.id,
-          color: b.color,
-          from: (Math.max(b.from, lo) - lo) / SEGMENT_KCAL,
-          to: (Math.min(b.to, hi) - lo) / SEGMENT_KCAL,
-        }));
-      return {
+  const { food, activity, cells: count, goalCells, budgetCells, litCells } = layout;
+  const { w, h } = box;
+  const cellH = h > 0 ? (h - GAP * (count - 1)) / count : 0;
+  const rx = Math.min(cellH / 2, 10);
+  const pitch = cellH + GAP;
+
+  /** px from the top of the inner column for the top edge of cell `i` */
+  const cellTop = (i: number) => h - (i + 1) * cellH - i * GAP;
+  /** a band's extent, px from the top of the inner column */
+  const span = (b: Band) => ({ top: h - (b.end * pitch - GAP), bottom: h - b.start * pitch });
+
+  const cells = useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
         i,
-        slices,
-        earned: lo >= goal && lo < budget,
-        // cells past the budget only exist once the day has gone over it
-        over: lo >= budget,
-      };
-    });
-  }, [count, food, goal, budget]);
+        y: h - (i + 1) * cellH - i * GAP,
+        earned: i >= goalCells && i < budgetCells,
+        over: i >= budgetCells,
+      })),
+    [count, h, cellH, goalCells, budgetCells],
+  );
 
-  // label positions in px, measured against the real column so they sit inside
-  // their own cells rather than at a percentage that ignores the gaps
-  const cellH = height > 0 ? (height - GAP * (count - 1)) / count : 0;
-  const yOf = (kcal: number) => {
-    const whole = Math.floor(kcal / SEGMENT_KCAL);
-    const part = (kcal % SEGMENT_KCAL) / SEGMENT_KCAL;
-    return whole * (cellH + GAP) + part * cellH;
-  };
+  // the cell layout as a mask, so the colour underneath shows only through cells
+  const mask = useMemo(() => {
+    if (!w || !h) return undefined;
+    const rects = cells
+      .map((c) => `<rect x="0" y="${c.y.toFixed(2)}" width="${w.toFixed(2)}" height="${cellH.toFixed(2)}" rx="${rx.toFixed(2)}"/>`)
+      .join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><g fill="#fff">${rects}</g></svg>`;
+    return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  }, [cells, w, h, cellH, rx]);
+
+  /* ---- labels: one per meal, plus earned room nobody has eaten into yet ---- */
+
+  const visibleActivity = activity.filter((b) => litCells < b.end);
+  const labels = (() => {
+    if (!h) return [];
+    const H = h + PAD * 2;
+    const items = [...food, ...visibleActivity].map((b) => {
+      const s = span(b);
+      const isActivity = b.entry.kind === 'activity';
+      // earned room that food has started eating into is labelled on what is left
+      const top = s.top;
+      const bottom = isActivity && litCells > b.start ? h - litCells * pitch : s.bottom;
+      return { band: b, isActivity, top: top + PAD, bottom: bottom + PAD, mid: (top + bottom) / 2 + PAD, y: (top + bottom) / 2 + PAD };
+    });
+
+    // spread overlapping labels apart: top to bottom, then back up from the floor
+    items.sort((a, b) => a.mid - b.mid);
+    for (let i = 0; i < items.length; i++) {
+      const min = i === 0 ? LABEL_H / 2 : items[i - 1].y + LABEL_H;
+      items[i].y = Math.max(items[i].y, min);
+    }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const max = i === items.length - 1 ? H - LABEL_H / 2 : items[i + 1].y - LABEL_H;
+      items[i].y = Math.min(items[i].y, max);
+    }
+    return items;
+  })();
 
   return (
-    <div ref={ref} style={{ position: 'relative', height: '100%', minHeight: 0 }}>
-      <div
-        role="img"
-        aria-label={`${Math.round(eaten)} of ${budget} kcal`}
-        style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column-reverse', gap: GAP }}
-      >
-        {cells.map((c) => (
-          <div
-            key={c.i}
+    <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
+      {/* ------------------------------------------------------------ labels */}
+      <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0 }}>
+        {h > 0 && (
+          <svg
+            aria-hidden
+            width={RAIL}
+            height={h + PAD * 2}
+            style={{ position: 'absolute', right: 0, top: 0, overflow: 'visible' }}
+          >
+            {labels.map((l) => (
+              <g key={l.band.entry.id}>
+                <motion.rect
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: l.isActivity ? 0.55 : 1 }}
+                  transition={{ duration: 0.4, delay: 0.3 }}
+                  x={RAIL - 5}
+                  y={l.top + 1}
+                  width={3}
+                  height={Math.max(2, l.bottom - l.top - 2)}
+                  rx={1.5}
+                  fill={l.band.color}
+                />
+                <path
+                  d={`M 0 ${l.y.toFixed(1)} L 3 ${l.y.toFixed(1)} L ${RAIL - 7} ${l.mid.toFixed(1)}`}
+                  fill="none"
+                  stroke="var(--ink-14)"
+                  strokeWidth={1}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+            ))}
+          </svg>
+        )}
+
+        {labels.map((l) => (
+          <motion.button
+            key={l.band.entry.id}
+            type="button"
+            onClick={() => onSelect(l.band.entry)}
+            initial={{ opacity: 0, x: 6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: ease.arrive, delay: 0.25 }}
             style={{
-              position: 'relative',
-              flex: '1 1 0',
-              minHeight: 2,
-              borderRadius: Math.min(7, Math.max(2, cellH / 2.6)),
-              overflow: 'hidden',
-              background: c.earned ? 'rgba(77,165,102,0.08)' : 'var(--paper)',
-              boxShadow: c.over
-                ? 'inset 0 0 0 1.5px var(--coral)'
-                : c.earned
-                  ? 'inset 0 0 0 1px rgba(77,165,102,0.42)'
-                  : 'inset 0 0 0 1px var(--ink-08)',
+              position: 'absolute',
+              right: RAIL + 2,
+              left: 0,
+              top: l.y - LABEL_H / 2,
+              height: LABEL_H,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'flex-end',
+              textAlign: 'right',
+              minWidth: 0,
             }}
           >
-            {c.slices.map((s) => (
-              <motion.span
-                key={`${s.id}-${c.i}`}
-                initial={{ scaleY: 0, opacity: 0 }}
-                animate={{ scaleY: 1, opacity: 1 }}
-                transition={{ duration: 0.42, ease: ease.arrive, delay: Math.min(c.i * 0.012, 0.5) }}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: `${s.from * 100}%`,
-                  height: `${(s.to - s.from) * 100}%`,
-                  transformOrigin: 'bottom',
-                  background: s.color,
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.55)',
-                }}
-              />
-            ))}
-            {c.over && c.slices.length > 0 && (
-              <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'rgba(255,131,96,0.22)' }} />
-            )}
-          </div>
+            <span
+              style={{
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                fontSize: 12.5,
+                fontWeight: 400,
+                lineHeight: 1.15,
+                letterSpacing: '-0.015em',
+                color: l.isActivity ? 'var(--green-deep)' : 'var(--ink)',
+              }}
+            >
+              {l.band.entry.label}
+            </span>
+            <span style={{ fontSize: 10.5, lineHeight: 1.2, color: l.isActivity ? 'var(--green)' : 'var(--ink-45)' }}>
+              {l.isActivity ? '+' : ''}
+              {Math.round(l.band.entry.kcal)} kcal
+            </span>
+          </motion.button>
         ))}
       </div>
 
-      {/* Labels and hit areas, one per meal. Drawn over the cells rather than in them
-          so a meal that straddles cells still reads as one thing. */}
-      {cellH > 0 && (
-        <div style={{ position: 'absolute', inset: 0 }}>
-          {food.map((b) => {
-            const bottom = yOf(b.from);
-            const top = yOf(b.to);
-            const h = Math.max(top - bottom, 0);
-            return (
-              <button
-                key={b.entry.id}
-                type="button"
-                onClick={() => onSelect(b.entry)}
-                aria-label={`${b.entry.label}, ${Math.round(b.entry.kcal)} kcal`}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom,
-                  height: Math.max(h, 10),
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 10px',
-                  gap: 6,
-                  textAlign: 'left',
-                  overflow: 'hidden',
-                }}
-              >
-                {h >= 15 && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3, duration: 0.3 }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      gap: 6,
-                      minWidth: 0,
-                      width: '100%',
-                      fontSize: 11.5,
-                      lineHeight: 1.1,
-                      color: 'var(--ink)',
-                    }}
-                  >
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 400 }}>
-                      {b.entry.label}
-                    </span>
-                    <span style={{ flex: '0 0 auto', color: 'var(--ink-45)', fontSize: 10.5 }}>{Math.round(b.entry.kcal)}</span>
-                  </motion.span>
-                )}
-              </button>
-            );
-          })}
+      {/* -------------------------------------------------------------- bar */}
+      <Squircle
+        radius={30}
+        stroke="ink"
+        style={{ flex: '0 0 47%', height: '100%', background: 'var(--paper)', boxShadow: 'var(--lift-2)', padding: PAD }}
+      >
+        <div ref={ref} style={{ position: 'relative', height: '100%' }} role="img" aria-label={`${litCells * 50} of ${budgetCells * 50} kcal`}>
+          {/* the unlit cells */}
+          {w > 0 && (
+            <svg width={w} height={h} style={{ position: 'absolute', inset: 0, display: 'block' }} aria-hidden>
+              {cells.map((c) => (
+                <rect
+                  key={c.i}
+                  x={0.5}
+                  y={c.y + 0.5}
+                  width={w - 1}
+                  height={Math.max(0, cellH - 1)}
+                  rx={rx}
+                  fill={c.earned ? 'rgba(31,107,82,0.08)' : 'rgba(14,15,17,0.045)'}
+                  stroke={c.earned ? 'rgba(31,107,82,0.4)' : 'none'}
+                  strokeWidth={1}
+                  strokeDasharray={c.earned ? '2 3' : undefined}
+                />
+              ))}
+            </svg>
+          )}
 
-          {/* earned room, labelled only while nothing has been eaten into it */}
-          {activity.map((b) => {
-            if (eaten >= b.to - SEGMENT_KCAL / 2) return null;
-            const bottom = yOf(Math.max(b.from, eaten));
-            const h = yOf(b.to) - bottom;
-            return (
-              <button
-                key={b.entry.id}
-                type="button"
-                onClick={() => onSelect(b.entry)}
-                aria-label={`${b.entry.label}, plus ${Math.round(b.entry.kcal)} kcal`}
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom,
-                  height: Math.max(h, 10),
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: '0 10px',
-                  gap: 6,
-                  overflow: 'hidden',
-                }}
-              >
-                {h >= 15 && (
-                  <span style={{ display: 'flex', gap: 6, width: '100%', fontSize: 11, color: 'var(--green-deep)' }}>
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {b.entry.label}
-                    </span>
-                    <span style={{ flex: '0 0 auto' }}>+{Math.round(b.entry.kcal)}</span>
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {/* the meals, as colour fields seen through the cells */}
+          {mask && (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                maskImage: mask,
+                WebkitMaskImage: mask,
+                maskSize: `${w}px ${h}px`,
+                WebkitMaskSize: `${w}px ${h}px`,
+                maskRepeat: 'no-repeat',
+                WebkitMaskRepeat: 'no-repeat',
+              }}
+            >
+              {food.map((b, i) => {
+                const s = span(b);
+                return (
+                  <motion.div
+                    key={b.entry.id}
+                    initial={{ clipPath: 'inset(100% 0% 0% 0%)' }}
+                    animate={{ clipPath: 'inset(0% 0% 0% 0%)' }}
+                    transition={{ duration: 0.7, ease: ease.arrive, delay: Math.min(i * 0.06, 0.4) }}
+                    style={{ position: 'absolute', left: 0, right: 0, top: s.top, height: s.bottom - s.top }}
+                  >
+                    <GradientField tone={b.tone} blur={22} rotate={i * 37} />
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* past the budget */}
+          {w > 0 && (
+            <svg width={w} height={h} style={{ position: 'absolute', inset: 0, display: 'block', pointerEvents: 'none' }} aria-hidden>
+              {cells
+                .filter((c) => c.over)
+                .map((c) => (
+                  <rect key={c.i} x={1} y={cellTop(c.i) + 1} width={w - 2} height={Math.max(0, cellH - 2)} rx={rx} fill="none" stroke="var(--coral)" strokeWidth={1.5} />
+                ))}
+            </svg>
+          )}
+
+          {/* the meals are tappable on the bar as well as by their labels */}
+          {h > 0 &&
+            [...food, ...visibleActivity].map((b) => {
+              const s = span(b);
+              return (
+                <button
+                  key={b.entry.id}
+                  type="button"
+                  tabIndex={-1}
+                  aria-hidden
+                  onClick={() => onSelect(b.entry)}
+                  style={{ position: 'absolute', left: 0, right: 0, top: s.top, height: Math.max(10, s.bottom - s.top) }}
+                />
+              );
+            })}
         </div>
-      )}
+      </Squircle>
     </div>
   );
 }

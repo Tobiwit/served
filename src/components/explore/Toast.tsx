@@ -17,16 +17,17 @@ export function Toast({
     <AnimatePresence>
       {message && (
         <motion.div
-          initial={{ opacity: 0, y: 16, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 10, scale: 0.97, transition: { duration: 0.24, ease: ease.depart } }}
+          // centred through motion's own x: a `transform` in style is overwritten the
+          // moment motion animates y or scale, which left the pill hanging off-centre
+          initial={{ opacity: 0, x: '-50%', y: 16, scale: 0.96 }}
+          animate={{ opacity: 1, x: '-50%', y: 0, scale: 1 }}
+          exit={{ opacity: 0, x: '-50%', y: 10, scale: 0.97, transition: { duration: 0.24, ease: ease.depart } }}
           transition={spring.settle}
           role="status"
           className="hairline"
           style={{
             position: 'absolute',
             left: '50%',
-            transform: 'translateX(-50%)',
             bottom: 'calc(var(--safe-b) + 84px)',
             zIndex: 30,
             display: 'flex',

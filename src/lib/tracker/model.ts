@@ -1,4 +1,5 @@
 import type { FoodLogEntry, MealSlot } from '@/lib/db/types';
+import type { Tone } from '@/components/glass/GradientField';
 
 /**
  * The tracker's vocabulary: goals, days, the colour of each part of the day, and the
@@ -77,17 +78,32 @@ export function dayTitle(key: string): { title: string; sub: string } {
 
 /* ----------------------------------------------------------------------- slots */
 
-/** Taken from the palette families — light enough that ink labels sit on them. */
-export const SLOT_COLOR: Record<MealSlot, string> = {
-  breakfast: '#ffd0aa',
-  coffee: '#f5a951',
-  lunch: '#d9f265',
-  snack: '#ffa3c6',
-  dinner: '#c9bcee',
-  postgym: '#a5d8e6',
+/**
+ * Each part of the day lights in one of the instrument's own colour fields — the
+ * same light that sits under the Explore panels, so a lit cell on the tracker and
+ * an engaged filter are visibly the same material.
+ */
+export const SLOT_TONE: Record<MealSlot, Tone> = {
+  breakfast: 'calories',
+  coffee: 'plateWarm',
+  lunch: 'health',
+  snack: 'boost',
+  dinner: 'time',
+  postgym: 'volume',
 };
 
-export const ACTIVITY_COLOR = '#4da566';
+/** A solid stand-in for each field, for chips and small marks. */
+export const SLOT_COLOR: Record<MealSlot, string> = {
+  breakfast: '#e28a45',
+  coffee: '#8a3520',
+  lunch: '#5ba055',
+  snack: '#e77ba0',
+  dinner: '#8f8ad2',
+  postgym: '#6d8cc4',
+};
+
+export const ACTIVITY_TONE: Tone = 'engage';
+export const ACTIVITY_COLOR = '#1f6b52';
 
 export interface ActivityPreset {
   key: string;
@@ -140,36 +156,68 @@ export function totalsFor(entries: FoodLogEntry[], goals: Goals): DayTotals {
   };
 }
 
-/** A run of kcal on the bar, in kcal from the bottom. */
+/**
+ * A run of whole cells on the bar, counted from the floor. `start` is the first
+ * cell it lights and `end` the one after its last.
+ */
 export interface Band {
   entry: FoodLogEntry;
-  from: number;
-  to: number;
+  start: number;
+  end: number;
+  tone: Tone;
   color: string;
+}
+
+export interface BarLayout {
+  food: Band[];
+  activity: Band[];
+  /** cells in the column */
+  cells: number;
+  /** cells up to the plain goal; anything above it up to `budgetCells` was earned */
+  goalCells: number;
+  budgetCells: number;
+  /** cells food has lit */
+  litCells: number;
 }
 
 /**
  * Food stacks from the floor in the order it was eaten. Activities sit above the
  * goal line — they are the room they earned, and food fills into them like any
- * other segment.
+ * other cell.
+ *
+ * The bar only ever lights whole cells. Each band's edges are the running total
+ * rounded to the nearest cell, so the column stays honest about the day as a whole
+ * (rounding errors don't pile up meal after meal), and every meal gets at least one
+ * cell — a coffee under 25 kcal should still be visible on the day it was drunk.
+ * The exact number lives in the readout beside the bar.
  */
-export function bandsFor(t: DayTotals, goals: Goals): { food: Band[]; activity: Band[]; capacity: number } {
-  let at = 0;
+export function bandsFor(t: DayTotals, goals: Goals): BarLayout {
+  const cellOf = (kcal: number) => Math.round(kcal / SEGMENT_KCAL);
+
+  let kcal = 0;
+  let cell = 0;
   const food = t.food.map((entry) => {
-    const band = { entry, from: at, to: at + Math.max(0, entry.kcal), color: entry.slot ? SLOT_COLOR[entry.slot] : SLOT_COLOR.snack };
-    at = band.to;
-    return band;
+    kcal += Math.max(0, entry.kcal);
+    const start = cell;
+    const end = Math.max(start + 1, cellOf(kcal));
+    cell = end;
+    const tone = entry.slot ? SLOT_TONE[entry.slot] : SLOT_TONE.snack;
+    const color = entry.slot ? SLOT_COLOR[entry.slot] : SLOT_COLOR.snack;
+    return { entry, start, end, tone, color };
   });
 
-  let top = goals.kcal;
+  const goalCells = Math.max(1, cellOf(goals.kcal));
+  let earnedKcal = goals.kcal;
+  let top = goalCells;
   const activity = t.activities.map((entry) => {
-    const band = { entry, from: top, to: top + Math.max(0, entry.kcal), color: ACTIVITY_COLOR };
-    top = band.to;
-    return band;
+    earnedKcal += Math.max(0, entry.kcal);
+    const start = top;
+    const end = Math.max(start + 1, cellOf(earnedKcal));
+    top = end;
+    return { entry, start, end, tone: ACTIVITY_TONE, color: ACTIVITY_COLOR };
   });
 
-  const capacity = Math.max(SEGMENT_KCAL, Math.ceil(Math.max(t.budget, t.eaten) / SEGMENT_KCAL) * SEGMENT_KCAL);
-  return { food, activity, capacity };
+  return { food, activity, cells: Math.max(top, cell, 1), goalCells, budgetCells: top, litCells: cell };
 }
 
 export function round1(n: number): number {
