@@ -101,8 +101,11 @@ function build(recipe: Recipe, run: RunState, index: Map<string, Ingredient>): R
   return changed ? { ...recipe, ingredients } : recipe;
 }
 
-/** The slot, made of the option actually standing in it. */
-function standIn(
+/**
+ * The slot, made of the option actually standing in it. Exported for the tracker,
+ * which logs a swap the same way Explore counts one.
+ */
+export function standIn(
   ri: RecipeIngredient,
   sub: RecipeIngredient['substitutions'][number],
   ingredientId: string,

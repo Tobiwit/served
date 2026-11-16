@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useData } from '@/lib/store/DataProvider';
 import { parseRecipeText } from '@/lib/parse/recipeText';
-import { draftFromParsed, emptyDraft, toNewRecipe, type Draft } from '@/lib/add/draft';
+import { draftFromParsed, draftIngredient, emptyDraft, toNewRecipe, withSwapRows, type Draft } from '@/lib/add/draft';
 import { RecipeEditor } from '@/components/add/RecipeEditor';
 import { Backlog, FromBacklogNote } from '@/components/add/Backlog';
+import { DictateIngredients, type DictatedLine } from '@/components/add/DictateIngredients';
 import type { BacklogEntry } from '@/lib/db/types';
 
 const SAMPLE = `Miso Butter Mushroom Toast
@@ -36,6 +37,18 @@ export default function AddPage() {
   const [saving, setSaving] = useState(false);
   /** the backlog entry being written up, if this draft came from one */
   const [from, setFrom] = useState<BacklogEntry | null>(null);
+  const [dictating, setDictating] = useState(false);
+
+  /** Dictated lines open the editor the same way parsed text does, just without a title yet. */
+  const startFromDictation = (lines: DictatedLine[]) => {
+    setDictating(false);
+    startDraft(
+      withSwapRows({
+        ...emptyDraft(),
+        ingredients: lines.map((l) => draftIngredient({ ...l, notes: null, role: 'core' }, ingredients, ingredientIndex)),
+      }),
+    );
+  };
 
   const startDraft = (next: Draft, source: BacklogEntry | null = null) => {
     setFrom(source);
@@ -119,6 +132,18 @@ export default function AddPage() {
           </button>
           <button
             type="button"
+            onClick={() => setDictating(true)}
+            className="surface hairline"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '14px 18px', borderRadius: 'var(--r-pill)', fontSize: 14, fontWeight: 300 }}
+          >
+            <svg width="15" height="15" viewBox="0 0 22 22" aria-hidden>
+              <rect x="8" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M5 11a6 6 0 0 0 12 0M11 17v2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Dictate
+          </button>
+          <button
+            type="button"
             onClick={() => startDraft(emptyDraft())}
             className="surface hairline"
             style={{ padding: '14px 20px', borderRadius: 'var(--r-pill)', fontSize: 14, fontWeight: 300, color: 'var(--ink-45)' }}
@@ -137,6 +162,8 @@ export default function AddPage() {
         </button>
 
         <Backlog onWriteUp={(entry) => startDraft({ ...emptyDraft(), title: entry.title }, entry)} />
+
+        <DictateIngredients open={dictating} onClose={() => setDictating(false)} onDone={startFromDictation} />
       </main>
     );
   }

@@ -1,8 +1,7 @@
 import type { FoodLogItem, Ingredient, MealSlot, NewFoodLogEntry, Recipe } from '@/lib/db/types';
-import type { Nutrition } from '@/lib/nutrition/calc';
 import { normalize } from '@/lib/match/fuzzy';
 import { formatAmount, toGrams } from '@/lib/nutrition/units';
-import { round1 } from './model';
+import { NO_CHOICES, itemOf, plateItems, plateOf, sumItems } from './recipeLog';
 
 /**
  * Quicklinks: the things eaten often enough that saying or typing them every time
@@ -67,33 +66,19 @@ export type QuickPlan =
   | { ok: false; missing: 'ingredient'; item: QuickItem }
   | { ok: false; missing: 'recipe'; title: string };
 
-/** Everything needed to log a quicklink now — or what is missing first. */
-export function planQuick(
-  q: Quicklink,
-  ingredients: Ingredient[],
-  recipes: Recipe[],
-  perServing: (r: Recipe) => Nutrition,
-): QuickPlan {
+/**
+ * Everything needed to log a quicklink now — or what is missing first. A recipe is
+ * logged as written (every optional in, every slot as the recipe leads it): a quick
+ * tap cannot ask, and the entry can be adjusted afterwards from the bar.
+ */
+export function planQuick(q: Quicklink, ingredients: Ingredient[], recipes: Recipe[], index: Map<string, Ingredient>): QuickPlan {
   if (q.kind === 'recipe') {
     const recipe = exactRecipe(q.recipe, recipes);
     if (!recipe) return { ok: false, missing: 'recipe', title: q.recipe };
-    const n = perServing(recipe);
-    const scale = (v: number | null) => (v == null ? null : round1(v * q.servings));
+    const items = plateItems(plateOf(recipe, NO_CHOICES, index), q.servings, index);
     return {
       ok: true,
-      entry: {
-        kind: 'food',
-        slot: q.slot,
-        label: q.label,
-        kcal: Math.round((n.kcal ?? 0) * q.servings),
-        protein: scale(n.protein),
-        carbs: scale(n.carbs),
-        fat: scale(n.fat),
-        source: 'recipe',
-        recipe_id: recipe.id,
-        servings: q.servings,
-        items: [],
-      },
+      entry: { kind: 'food', slot: q.slot, label: q.label, ...sumItems(items), source: 'recipe', recipe_id: recipe.id, servings: q.servings, items },
     };
   }
 
@@ -101,36 +86,11 @@ export function planQuick(
   for (const it of q.items) {
     const ing = exactIngredient([it.name, ...it.match], ingredients);
     if (!ing) return { ok: false, missing: 'ingredient', item: it };
-    const grams = toGrams(it.amount, it.unit, ing);
-    const per = (v: number | null) => (grams != null && v != null ? round1((grams / 100) * v) : null);
-    items.push({
-      name: ing.name,
-      ingredient_id: ing.id,
-      amount: it.amount,
-      unit: it.unit,
-      grams,
-      kcal: per(ing.kcal_100g),
-      protein: per(ing.protein_100g),
-      carbs: per(ing.carbs_100g),
-      fat: per(ing.fat_100g),
-    });
+    items.push(itemOf(ing, toGrams(it.amount, it.unit, ing), it.name, it.amount, it.unit));
   }
-  const sum = (k: 'kcal' | 'protein' | 'carbs' | 'fat') => round1(items.reduce((s, i) => s + (i[k] ?? 0), 0));
   return {
     ok: true,
-    entry: {
-      kind: 'food',
-      slot: q.slot,
-      label: q.label,
-      kcal: Math.round(sum('kcal')),
-      protein: sum('protein'),
-      carbs: sum('carbs'),
-      fat: sum('fat'),
-      source: 'log',
-      recipe_id: null,
-      servings: null,
-      items,
-    },
+    entry: { kind: 'food', slot: q.slot, label: q.label, ...sumItems(items), source: 'log', recipe_id: null, servings: null, items },
   };
 }
 

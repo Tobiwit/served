@@ -81,7 +81,7 @@ const ACTIVITY_OPTIONS: RadialOption[] = ACTIVITY_PRESETS.map((a) => ({
 
 export default function TrackerPage() {
   const router = useRouter();
-  const { foodLog, saveFoodLog, deleteFoodLog, ready, ingredients, allRecipes, analysisFor } = useData();
+  const { foodLog, saveFoodLog, deleteFoodLog, ready, ingredients, ingredientIndex, allRecipes } = useData();
   const [day, setDay] = useState(dayKey);
   const [goals, setGoals] = useState<Goals>(DEFAULT_GOALS);
   useEffect(() => setGoals(loadGoals()), []);
@@ -108,10 +108,9 @@ export default function TrackerPage() {
 
   /* ---- quicklinks: one tap, or one question first if something is missing ---- */
 
-  const perServing = useMemo(() => (r: Parameters<typeof analysisFor>[0]) => analysisFor(r).nutrition.perServing, [analysisFor]);
   const quick = useMemo(
-    () => QUICKLINKS.map((q) => ({ q, plan: planQuick(q, ingredients, allRecipes, perServing) })),
-    [ingredients, allRecipes, perServing],
+    () => QUICKLINKS.map((q) => ({ q, plan: planQuick(q, ingredients, allRecipes, ingredientIndex) })),
+    [ingredients, allRecipes, ingredientIndex],
   );
   const quickOptions: RadialOption[] = quick.map(({ q, plan }) => ({
     key: q.key,
@@ -128,7 +127,7 @@ export default function TrackerPage() {
   useEffect(() => () => void (toastTimer.current && window.clearTimeout(toastTimer.current)), []);
 
   const logQuick = async (q: Quicklink, extra: Ingredient[] = []) => {
-    const plan = planQuick(q, [...ingredients, ...extra], allRecipes, perServing);
+    const plan = planQuick(q, [...ingredients, ...extra], allRecipes, new Map([...ingredientIndex, ...extra.map((i) => [i.id, i] as const)]));
     if (!plan.ok) {
       if (plan.missing === 'ingredient') setQuickSetup({ q, item: plan.item });
       else

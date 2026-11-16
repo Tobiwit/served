@@ -140,3 +140,27 @@ export function useDictation({ lang, onFinal }: { lang: SpeechLang; onFinal: (te
 
   return { supported, listening, interim, error, start, stop };
 }
+
+const LANG_KEY = 'served.tracker.lang';
+
+/** The dictation language, remembered on this device across every place that listens. */
+export function useSpeechLang(): [SpeechLang, (l: SpeechLang) => void] {
+  const [lang, setLang] = useState<SpeechLang>('en-US');
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(LANG_KEY);
+      if (saved === 'de-DE' || saved === 'en-US') setLang(saved);
+    } catch {
+      /* default */
+    }
+  }, []);
+  const choose = useCallback((l: SpeechLang) => {
+    setLang(l);
+    try {
+      window.localStorage.setItem(LANG_KEY, l);
+    } catch {
+      /* fine */
+    }
+  }, []);
+  return [lang, choose];
+}

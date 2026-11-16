@@ -11,7 +11,7 @@ import { GradientField } from '@/components/glass/GradientField';
 import { Ripple } from '@/components/instrument/Ripple';
 import { formatAmount } from '@/lib/nutrition/units';
 import { findIngredient, gramsFor, parseUtterance, type SpeechLang, type SpokenItem } from '@/lib/tracker/spoken';
-import { useDictation } from '@/lib/tracker/useDictation';
+import { useDictation, useSpeechLang } from '@/lib/tracker/useDictation';
 import { SLOT_COLOR, round1 } from '@/lib/tracker/model';
 import { ease, spring } from '@/lib/motion';
 
@@ -42,8 +42,6 @@ interface Draft {
   /** an unknown item you chose not to fill in — kept on the meal, counted as nothing */
   skipped?: boolean;
 }
-
-const LANG_KEY = 'served.tracker.lang';
 
 let seq = 0;
 const nextKey = () => `d${Date.now().toString(36)}${(seq++).toString(36)}`;
@@ -96,30 +94,12 @@ export function FoodComposer({
   const [label, setLabel] = useState('');
   const [typed, setTyped] = useState('');
   const [saving, setSaving] = useState(false);
-  const [lang, setLang] = useState<SpeechLang>('en-US');
+  const [lang, chooseLang] = useSpeechLang();
 
   // the ingredient list changes when one is created mid-flow; reads go through a ref
   // so a dictation callback never resolves against a stale copy
   const ingredientsRef = useRef(ingredients);
   ingredientsRef.current = ingredients;
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(LANG_KEY);
-      if (saved === 'de-DE' || saved === 'en-US') setLang(saved);
-    } catch {
-      /* default */
-    }
-  }, []);
-
-  const chooseLang = (l: SpeechLang) => {
-    setLang(l);
-    try {
-      window.localStorage.setItem(LANG_KEY, l);
-    } catch {
-      /* fine */
-    }
-  };
 
   // a fresh flow every time the sheet opens
   useEffect(() => {
@@ -401,7 +381,7 @@ function SlotStrip({ slot }: { slot: MealSlot }) {
   );
 }
 
-function VoicePanel({
+export function VoicePanel({
   lang,
   onLang,
   supported,
