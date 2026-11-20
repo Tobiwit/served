@@ -1,12 +1,13 @@
 import type { Ingredient, Recipe, RecipeIngredient } from '@/lib/db/types';
 import type { RecipeAnalysis } from '@/lib/scoring';
 import type { FilterState } from './filters';
+import { EMPTY_PLAN, type FitPlan } from './liveRecipe';
 
 /**
  * Candidate selection.
  *
  * all recipes
- *   -> apply setup filters
+ *   -> apply setup filters, letting swaps and left-out optionals make a recipe fit
  *   -> drop recipes already seen this run
  *   -> excluded CORE ingredient: drop
  *   -> excluded OPTIONAL / SUBSTITUTABLE: keep (substitutable flags a swap)
@@ -18,25 +19,37 @@ import type { FilterState } from './filters';
 
 export interface Candidate {
   recipe: Recipe;
+  /** of the plate as this run and the fit plan have left it */
   analysis: RecipeAnalysis;
+  /** swaps and left-out optionals that make it meet the filters */
+  plan: FitPlan;
   /** substitutable ingredients the user excluded — the recipe survives, with a note */
   swaps: string[];
   boostHits: number;
 }
 
 export function passesFilters(recipe: Recipe, analysis: RecipeAnalysis, f: FilterState): boolean {
-  const n = analysis.nutrition.perServing;
+  return passesFixed(recipe, f) && passesScored(analysis, f);
+}
 
-  if (f.protein.on && (n.protein == null || n.protein < f.protein.value)) return false;
-  if (f.calories.on && (n.kcal == null || n.kcal > f.calories.value)) return false;
-  if (f.volume.on && analysis.volume.score < f.volume.value) return false;
-  if (f.health.on && analysis.health.score < f.health.value) return false;
+/** The filters no swap or left-out ingredient can change: time, cuisine, course. */
+export function passesFixed(recipe: Recipe, f: FilterState): boolean {
   if (f.time.on) {
     const t = recipe.total_minutes;
     if (t == null || t > f.time.value) return false;
   }
   if (f.cuisineOn && f.cuisines.length && !(recipe.cuisine && f.cuisines.includes(recipe.cuisine))) return false;
   if (f.courses.length && !(recipe.course_type && f.courses.includes(recipe.course_type))) return false;
+  return true;
+}
+
+/** The filters read off the plate: protein, calories, volume, health. */
+export function passesScored(analysis: RecipeAnalysis, f: FilterState): boolean {
+  const n = analysis.nutrition.perServing;
+  if (f.protein.on && (n.protein == null || n.protein < f.protein.value)) return false;
+  if (f.calories.on && (n.kcal == null || n.kcal > f.calories.value)) return false;
+  if (f.volume.on && analysis.volume.score < f.volume.value) return false;
+  if (f.health.on && analysis.health.score < f.health.value) return false;
   return true;
 }
 
@@ -49,10 +62,13 @@ export function countMatches(
   return recipes.reduce((n, r) => n + (passesFilters(r, analysisFor(r), filters) ? 1 : 0), 0);
 }
 
+/**
+ * `fitFor` answers whether a recipe can meet the filters, and as what plate: null
+ * when no allowed swap or left-out optional gets it there (see `fit.ts`).
+ */
 export function buildCandidates(
   recipes: Recipe[],
-  analysisFor: (r: Recipe) => RecipeAnalysis,
-  filters: FilterState,
+  fitFor: (r: Recipe) => { plan: FitPlan; analysis: RecipeAnalysis } | null,
   excluded: Set<string>,
   boosted: Set<string>,
   seen: Set<string>,
@@ -60,9 +76,9 @@ export function buildCandidates(
   const out: Candidate[] = [];
   for (const recipe of recipes) {
     if (seen.has(recipe.id)) continue;
-    const analysis = analysisFor(recipe);
-    if (!passesFilters(recipe, analysis, filters)) continue;
-    const c = evaluate(recipe, analysis, excluded, boosted);
+    const fit = fitFor(recipe);
+    if (!fit) continue;
+    const c = evaluate(recipe, fit.analysis, excluded, boosted, fit.plan);
     if (c) out.push(c);
   }
   return out;
@@ -78,6 +94,7 @@ export function evaluate(
   analysis: RecipeAnalysis,
   excluded: Set<string>,
   boosted: Set<string>,
+  plan: FitPlan = EMPTY_PLAN,
 ): Candidate | null {
   const swaps: string[] = [];
   let boostHits = 0;
@@ -106,7 +123,7 @@ export function evaluate(
     // optional: excluding it costs the recipe nothing
   }
 
-  return { recipe, analysis, swaps, boostHits };
+  return { recipe, analysis, plan, swaps, boostHits };
 }
 
 /** Every ingredient that could fill a slot: the named one, then its alternatives. */

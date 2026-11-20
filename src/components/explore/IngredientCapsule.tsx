@@ -18,6 +18,7 @@ import { settleDelay, spring } from '@/lib/motion';
  *   tap a live pill        rule it out
  *   hold a live pill       prioritise recipes containing it
  *   hold a darkened pill   put it back
+ *   hold a left-out pill   keep it (left out only to meet the filters)
  */
 
 const LONG_PRESS_MS = 420;
@@ -29,6 +30,12 @@ export interface CapsuleOption {
   /** the first surviving option — what the recipe is made with right now */
   inUse: boolean;
   boosted: boolean;
+  /**
+   * An optional the fit planner left out so the plate meets the filters. It sits
+   * back like a ruled-out pill, but unstruck: nothing was decided against it. Hold
+   * to keep it, which is the same as asking for it; tap to rule it out for real.
+   */
+  fitted?: boolean;
 }
 
 type Props = {
@@ -174,7 +181,9 @@ function Pill({
       aria-label={
         option.killed
           ? `${option.name}, ruled out. Hold to put it back.`
-          : `${option.name}. Tap to rule out, hold to prioritise.`
+          : option.fitted
+            ? `${option.name}, left out to fit your filters. Hold to keep it, tap to rule it out.`
+            : `${option.name}. Tap to rule out, hold to prioritise.`
       }
       animate={{ scale: held ? 0.94 : 1 }}
       transition={spring.dial}
@@ -190,17 +199,19 @@ function Pill({
         // Ruled out is pressed *into* the glass, not painted black: a faint tinted
         // recess with a soft inner shadow and a lit bottom lip. Live pills sit
         // proud of the same surface. Same material, opposite relief.
-        color: option.killed ? 'var(--ink-30)' : 'var(--ink)',
+        color: option.killed ? 'var(--ink-30)' : option.fitted ? 'var(--ink-45)' : 'var(--ink)',
         textDecoration: option.killed ? 'line-through' : 'none',
         textDecorationColor: option.killed ? 'var(--ink-14)' : undefined,
-        background: option.killed
-          ? 'linear-gradient(180deg, rgba(14,15,17,0.075) 0%, rgba(14,15,17,0.03) 100%)'
-          : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.72) 100%)',
-        boxShadow: option.killed
-          ? 'inset 0 1.5px 3px rgba(14,15,17,0.16), inset 0 -1px 0 rgba(255,255,255,0.8)'
-          : option.boosted
-            ? '0 2px 5px rgba(14,15,17,0.13), 0 0 0 1px rgba(14,15,17,0.07), inset 0 1px 0 rgba(255,255,255,1)'
-            : '0 1px 2px rgba(14,15,17,0.09), inset 0 1px 0 rgba(255,255,255,1)',
+        background:
+          option.killed || option.fitted
+            ? 'linear-gradient(180deg, rgba(14,15,17,0.075) 0%, rgba(14,15,17,0.03) 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.72) 100%)',
+        boxShadow:
+          option.killed || option.fitted
+            ? 'inset 0 1.5px 3px rgba(14,15,17,0.16), inset 0 -1px 0 rgba(255,255,255,0.8)'
+            : option.boosted
+              ? '0 2px 5px rgba(14,15,17,0.13), 0 0 0 1px rgba(14,15,17,0.07), inset 0 1px 0 rgba(255,255,255,1)'
+              : '0 1px 2px rgba(14,15,17,0.09), inset 0 1px 0 rgba(255,255,255,1)',
         touchAction: 'manipulation',
         userSelect: 'none',
         WebkitUserSelect: 'none',

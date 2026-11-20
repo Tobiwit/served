@@ -8,6 +8,8 @@ const WATER_DEFAULT: Record<IngredientCategory, number> = {
   legume: 66,
   whole_grain: 60,
   refined_grain: 55,
+  ready_made: 55,
+  plant_protein: 70,
   protein_lean: 68,
   protein_fatty: 60,
   processed_meat: 45,
@@ -16,6 +18,7 @@ const WATER_DEFAULT: Record<IngredientCategory, number> = {
   dairy_low_fat: 85,
   dairy_full_fat: 72,
   cheese: 42,
+  protein_supplement: 6,
   nuts_seeds: 5,
   oil: 0,
   fat_solid: 16,
@@ -29,12 +32,14 @@ const WATER_DEFAULT: Record<IngredientCategory, number> = {
 export const PRODUCE: IngredientCategory[] = ['vegetable', 'fruit', 'legume'];
 export const PROCESSED: IngredientCategory[] = [
   'refined_grain',
+  'ready_made',
+  'protein_supplement',
   'processed_meat',
   'sweetener',
   'sauce_condiment',
   'fat_solid',
 ];
-export const SALTY: IngredientCategory[] = ['sauce_condiment', 'cheese', 'processed_meat'];
+export const SALTY: IngredientCategory[] = ['sauce_condiment', 'cheese', 'processed_meat', 'ready_made'];
 
 /**
  * Roughly what share of this kind of food's own fat is saturated.
@@ -58,6 +63,10 @@ export const SATURATED_SHARE: Record<IngredientCategory, number> = {
   legume: 0.16,
   whole_grain: 0.2,
   refined_grain: 0.24,
+  // a filling and a casing of unknown make: assume nothing either way
+  ready_made: 0.33,
+  // soy and wheat fat is mostly unsaturated
+  plant_protein: 0.17,
   protein_lean: 0.3,
   protein_fatty: 0.35,
   processed_meat: 0.38,
@@ -66,6 +75,8 @@ export const SATURATED_SHARE: Record<IngredientCategory, number> = {
   dairy_low_fat: 0.62,
   dairy_full_fat: 0.62,
   cheese: 0.63,
+  // dairy fat in the powders, palm and cocoa butter in the bars
+  protein_supplement: 0.55,
   nuts_seeds: 0.11,
   oil: 0.14,
   fat_solid: 0.65,

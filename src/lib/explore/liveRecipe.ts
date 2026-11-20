@@ -22,11 +22,40 @@ import { optionIds } from './candidates';
  * Shared with the Explore capsules deliberately. The pill you see leading the chain
  * and the ingredient the macros are counted from have to be the same one.
  */
-export function slotOptions(ri: RecipeIngredient, boosted: Set<string>): string[] {
+export function slotOptions(ri: RecipeIngredient, boosted: Set<string>, pick?: string): string[] {
   const ids = optionIds(ri);
   if (ri.role !== 'substitutable' || ids.length < 2) return ids.slice(0, 1);
   // stable, so anything unboosted keeps the order the recipe wrote it in
-  return [...ids].sort((a, b) => Number(boosted.has(b)) - Number(boosted.has(a)));
+  const ordered = [...ids].sort((a, b) => Number(boosted.has(b)) - Number(boosted.has(a)));
+  // a fit plan's pick leads the slot: the recipe said it would do, so it simply
+  // becomes the option the plate is made with
+  if (pick && ordered.includes(pick)) return [pick, ...ordered.filter((id) => id !== pick)];
+  return ordered;
+}
+
+/**
+ * What the fit planner decided for one recipe under the current filters
+ * (see `fit.ts`). Empty when the recipe fits as it is.
+ */
+export interface FitPlan {
+  /** substitutable line id -> the option standing in it */
+  picks: Record<string, string>;
+  /** optional ingredient ids left out so the plate meets the filters */
+  drops: string[];
+}
+
+export const EMPTY_PLAN: FitPlan = { picks: {}, drops: [] };
+
+export function planKey(plan: FitPlan): string {
+  const picks = Object.entries(plan.picks)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join(',');
+  return `${picks}/${[...plan.drops].sort().join(',')}`;
+}
+
+export function isEmptyPlan(plan: FitPlan): boolean {
+  return !plan.drops.length && !Object.keys(plan.picks).length;
 }
 
 export interface RunState {
@@ -51,22 +80,38 @@ export function runState(excluded: string[], boosted: string[]): RunState {
  */
 const cache = new WeakMap<Recipe, { key: string; result: Recipe }>();
 
-export function recipeForRun(recipe: Recipe, run: RunState, index: Map<string, Ingredient>): Recipe {
+export function recipeForRun(
+  recipe: Recipe,
+  run: RunState,
+  index: Map<string, Ingredient>,
+  plan: FitPlan = EMPTY_PLAN,
+): Recipe {
   // Wanting something counts as much as ruling something out: a want promotes its
   // option to the head of a swap chain, and the Explore pill leading that chain is
   // then the ingredient on the plate. The macros have to be counted from the same
   // one, or the capsule says chicken while the numbers are still halloumi.
-  if (!run.excluded.size && !run.boosted.size) return recipe;
+  const empty = isEmptyPlan(plan);
+  if (!run.excluded.size && !run.boosted.size && empty) return recipe;
 
+  const key = empty ? run.key : `${run.key}#${planKey(plan)}`;
   const hit = cache.get(recipe);
-  if (hit && hit.key === run.key) return hit.result;
+  if (hit && hit.key === key) return hit.result;
 
-  const result = build(recipe, run, index);
-  cache.set(recipe, { key: run.key, result });
+  const result = buildVariant(recipe, run, index, plan);
+  cache.set(recipe, { key, result });
   return result;
 }
 
-function build(recipe: Recipe, run: RunState, index: Map<string, Ingredient>): Recipe {
+/**
+ * Uncached. The fit planner tries many plans per recipe and keeps one, so its
+ * throwaway variants must not evict the one the screen is showing.
+ */
+export function buildVariant(
+  recipe: Recipe,
+  run: RunState,
+  index: Map<string, Ingredient>,
+  plan: FitPlan = EMPTY_PLAN,
+): Recipe {
   let changed = false;
   const ingredients: RecipeIngredient[] = [];
 
@@ -74,13 +119,17 @@ function build(recipe: Recipe, run: RunState, index: Map<string, Ingredient>): R
     // A ruled-out core ingredient takes the whole recipe with it, which the
     // candidate evaluator decides; by the time anything is displayed that has
     // already happened, so core lines are passed through untouched.
-    if (ri.role === 'optional' && ri.ingredient_id && run.excluded.has(ri.ingredient_id)) {
+    if (
+      ri.role === 'optional' &&
+      ri.ingredient_id &&
+      (run.excluded.has(ri.ingredient_id) || plan.drops.includes(ri.ingredient_id))
+    ) {
       changed = true;
       continue;
     }
 
     if (ri.role === 'substitutable') {
-      const live = slotOptions(ri, run.boosted).find((id) => !run.excluded.has(id));
+      const live = slotOptions(ri, run.boosted, plan.picks[ri.id]).find((id) => !run.excluded.has(id));
       if (!live) {
         changed = true;
         continue;

@@ -12,22 +12,28 @@ import { spring } from '@/lib/motion';
  * One dot per recipe in the collection, lit when it survives the current filters,
  * plus the live count — so over-filtering is something you see before you commit
  * to it. Rose throughout; only the depth shifts when nothing is left.
+ *
+ * `adjusted` is how many of the matches only get there with a swap or something
+ * left out — counted in, and said once, quietly.
  */
 
 type Props = {
   matching: number;
+  adjusted: number;
   total: number;
   litMap: boolean[];
 };
 
-export function MatchHero({ matching, total, litMap }: Props) {
+export function MatchHero({ matching, adjusted, total, litMap }: Props) {
   const tone: Tone = matching === 0 ? 'heroThin' : 'hero';
   const caption =
     matching === 0
       ? 'Nothing matches. Loosen something.'
       : matching === total
         ? 'Everything is on the table'
-        : `of ${total} recipes`;
+        : adjusted > 0
+          ? `of ${total} recipes · ${adjusted} adjusted to fit`
+          : `of ${total} recipes`;
 
   return (
     <Squircle

@@ -9,8 +9,8 @@ const ROWS: SeedRow[] = [
   // ---- protein ----
   ['Chicken breast', 'protein_lean', 165, 31, 0, 3.6, 0, 65, { aliases: ['chicken', 'chicken fillet', 'chicken breast fillet'] }],
   ['Chicken thigh', 'protein_fatty', 209, 26, 0, 11, 0, 60, { aliases: ['chicken thighs'] }],
-  ['Firm tofu', 'protein_lean', 144, 15.8, 2.8, 8.7, 2.3, 70, { aliases: ['tofu', 'extra firm tofu', 'smoked tofu'] }],
-  ['Tempeh', 'legume', 192, 20, 7.6, 11, 5, 55, {}],
+  ['Firm tofu', 'plant_protein', 144, 15.8, 2.8, 8.7, 2.3, 70, { aliases: ['tofu', 'extra firm tofu', 'smoked tofu'] }],
+  ['Tempeh', 'plant_protein', 192, 20, 7.6, 11, 5, 55, {}],
   ['Salmon fillet', 'seafood', 208, 20, 0, 13, 0, 64, { aliases: ['salmon'], units: [['piece', 130]] }],
   ['Smoked salmon', 'seafood', 117, 18, 0, 4.3, 0, 70, {}],
   ['Prawns', 'seafood', 99, 24, 0.2, 0.3, 0, 77, { aliases: ['shrimp', 'king prawns'] }],
@@ -21,7 +21,7 @@ const ROWS: SeedRow[] = [
   ['Egg white', 'egg', 52, 10.9, 0.7, 0.2, 0, 88, { aliases: ['egg whites'], units: [['piece', 33]] }],
   ['Bacon', 'processed_meat', 541, 37, 1.4, 42, 0, 25, { units: [['slice', 25]] }],
   ['Chorizo', 'processed_meat', 455, 24, 2, 38, 0, 32, {}],
-  ['Whey protein powder', 'other', 380, 80, 8, 5, 2, 5, { aliases: ['protein powder', 'whey'], units: [['scoop', 30]] }],
+  ['Whey protein powder', 'protein_supplement', 380, 80, 8, 5, 2, 5, { aliases: ['protein powder', 'whey'], units: [['scoop', 30]] }],
 
   // ---- legumes ----
   ['Chickpeas', 'legume', 164, 8.9, 27, 2.6, 7.6, 60, { aliases: ['garbanzo beans', 'canned chickpeas'], units: [['can', 240]] }],

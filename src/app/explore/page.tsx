@@ -6,7 +6,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
 import { buildCandidates, evaluate, exploreIngredients, optionIds, pickNext, type Candidate } from '@/lib/explore/candidates';
-import { recipeForRun, runState, slotOptions } from '@/lib/explore/liveRecipe';
+import { EMPTY_PLAN, recipeForRun, runState, slotOptions, type FitPlan } from '@/lib/explore/liveRecipe';
+import { fitFor } from '@/lib/explore/fit';
 import type { Recipe } from '@/lib/db/types';
 import { RecipePlate } from '@/components/explore/RecipePlate';
 import { IngredientCapsule, type CapsuleOption } from '@/components/explore/IngredientCapsule';
@@ -38,16 +39,23 @@ export default function ExplorePage() {
    * written — so ruling out the parmesan moves the numbers, here and on the detail
    * screen. `recipeForRun` hands back the same object when a recipe is untouched,
    * which is what keeps the analysis cache warm for the rest of the collection.
+   *
+   * The plan is how the recipe meets the filters: the swaps it allows, and any
+   * optional worth leaving out. Null when nothing it allows gets it there.
    */
-  const runAnalysis = useCallback(
-    (r: Recipe) => analysisFor(recipeForRun(r, run, ingredientIndex)),
-    [analysisFor, run, ingredientIndex],
+  const fitOf = useCallback(
+    (r: Recipe) => {
+      const fit = fitFor(r, run, session.filters, ingredientIndex);
+      if (!fit) return null;
+      return { plan: fit.plan, analysis: analysisFor(recipeForRun(r, run, ingredientIndex, fit.plan)) };
+    },
+    [analysisFor, run, session.filters, ingredientIndex],
   );
 
   /** Everything still available to move to. Does not include what is on screen. */
   const candidates = useMemo(
-    () => buildCandidates(recipes, runAnalysis, session.filters, excluded, boosted, seen),
-    [recipes, runAnalysis, session.filters, excluded, boosted, seen],
+    () => buildCandidates(recipes, fitOf, excluded, boosted, seen),
+    [recipes, fitOf, excluded, boosted, seen],
   );
 
   /**
@@ -61,9 +69,14 @@ export default function ExplorePage() {
     if (!recipe) return null;
     // evaluate reads the recipe as written — survival is decided by the roles it
     // was saved with — while the analysis it carries is the adjusted one
-    const c = evaluate(recipe, runAnalysis(recipe), excluded, boosted);
-    return c ?? { recipe, analysis: runAnalysis(recipe), swaps: [], boostHits: 0 };
-  }, [session.current, recipes, runAnalysis, excluded, boosted]);
+    // A plate that no longer fits keeps whatever the run left it as, with no plan.
+    const fit = fitOf(recipe) ?? {
+      plan: EMPTY_PLAN as FitPlan,
+      analysis: analysisFor(recipeForRun(recipe, run, ingredientIndex)),
+    };
+    const c = evaluate(recipe, fit.analysis, excluded, boosted, fit.plan);
+    return c ?? { recipe, analysis: fit.analysis, plan: fit.plan, swaps: [], boostHits: 0 };
+  }, [session.current, recipes, fitOf, analysisFor, run, ingredientIndex, excluded, boosted]);
 
   const candidatesRef = useRef(candidates);
   const currentIdRef = useRef<string | null>(null);
@@ -157,12 +170,24 @@ export default function ExplorePage() {
         const isGroup = ri.role === 'substitutable' && ids.length > 1;
         // the same ordering the macros are counted from, so the pill leading the
         // chain and the ingredient in the numbers are never two different things
-        const pool = slotOptions(ri, boosted);
+        // a planned swap leads the slot as though the recipe had been written with it
+        const pool = slotOptions(ri, boosted, current.plan.picks[ri.id]);
+
+        // left out to meet the filters: still on the row, sitting back, so you can
+        // see what the fit cost and hold it to keep it
+        const fitted = ri.role === 'optional' && !!ri.ingredient_id && current.plan.drops.includes(ri.ingredient_id);
 
         const revealed: CapsuleOption[] = [];
         for (const id of pool) {
           const killed = excluded.has(id);
-          revealed.push({ id, name: names.get(id) ?? id, killed, inUse: !killed, boosted: boosted.has(id) });
+          revealed.push({
+            id,
+            name: names.get(id) ?? id,
+            killed,
+            inUse: !killed && !fitted,
+            boosted: boosted.has(id),
+            fitted: fitted && !killed,
+          });
           if (!killed) break;
         }
 
@@ -189,6 +214,8 @@ export default function ExplorePage() {
   if (!hydrated || !ready) return <main style={{ minHeight: '100dvh' }} />;
 
   const remaining = candidates.filter((c) => c.recipe.id !== session.current).length;
+
+  const leftOut = current ? current.plan.drops.map((id) => ingredientIndex.get(id)?.name ?? id) : [];
 
   return (
     <main
@@ -248,7 +275,9 @@ export default function ExplorePage() {
               }}
             >
               <p className="t-micro t-dim" style={{ margin: 0 }}>
-                Tap to rule out · hold to prioritise
+                {leftOut.length
+                  ? `Without ${listNames(leftOut)} to fit · hold to keep`
+                  : 'Tap to rule out · hold to prioritise'}
               </p>
               <RunTallies
                 excluded={session.excluded}
@@ -304,4 +333,10 @@ export default function ExplorePage() {
       <Toast message={toast?.message ?? null} actionLabel={toast?.undo ? 'Undo' : undefined} onAction={toast?.undo} />
     </main>
   );
+}
+
+/** "a", "a and b" — the planner never leaves out more than two. */
+function listNames(names: string[]): string {
+  const low = names.map((n) => n.toLowerCase());
+  return low.length < 2 ? low.join('') : `${low.slice(0, -1).join(', ')} and ${low[low.length - 1]}`;
 }

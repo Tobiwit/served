@@ -6,7 +6,8 @@ import { motion } from 'motion/react';
 import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
 import { QUANT_SPECS, type QuantKey } from '@/lib/explore/filters';
-import { passesFilters } from '@/lib/explore/candidates';
+import { fitFor } from '@/lib/explore/fit';
+import { isEmptyPlan, runState } from '@/lib/explore/liveRecipe';
 import { MatchHero } from '@/components/setup/MatchHero';
 import { FilterPanel } from '@/components/setup/FilterPanel';
 import { CuisinePanel } from '@/components/setup/CuisinePanel';
@@ -36,7 +37,7 @@ import { ease, spring } from '@/lib/motion';
 
 export default function SetupPage() {
   const router = useRouter();
-  const { recipes, analysisFor } = useData();
+  const { recipes, ingredientIndex } = useData();
   const { session, setFilters, start, resetKeepFilters } = useExplore();
   const f = session.filters;
 
@@ -63,8 +64,18 @@ export default function SetupPage() {
     setGateOpen(false);
   };
 
-  const litMap = useMemo(() => recipes.map((r) => passesFilters(r, analysisFor(r), f)), [recipes, analysisFor, f]);
+  /**
+   * A recipe counts when it meets the filters as written, or once the fit planner
+   * has swapped what it allows and left out what is worth leaving out. Starting a
+   * run clears the last one's exclusions, so the count is read against a clean run.
+   */
+  const fits = useMemo(() => {
+    const run = runState([], []);
+    return recipes.map((r) => fitFor(r, run, f, ingredientIndex));
+  }, [recipes, f, ingredientIndex]);
+  const litMap = useMemo(() => fits.map((x) => x !== null), [fits]);
   const matching = litMap.filter(Boolean).length;
+  const adjusted = fits.filter((x) => x !== null && !isEmptyPlan(x.plan)).length;
 
   const toggle = (key: QuantKey) => setFilters((p) => ({ ...p, [key]: { ...p[key], on: !p[key].on } }));
   // dragging a scale engages its filter — reaching for the control is intent enough
@@ -120,7 +131,7 @@ export default function SetupPage() {
         </h1>
       </motion.header>
 
-      <MatchHero matching={matching} total={recipes.length} litMap={litMap} />
+      <MatchHero matching={matching} adjusted={adjusted} total={recipes.length} litMap={litMap} />
 
       {/* protein + calories on the left, time standing full height on the right */}
       <section style={{ flex: '1.05 1 0', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 9, minHeight: 0 }}>

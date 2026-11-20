@@ -7,6 +7,7 @@ import { useData } from '@/lib/store/DataProvider';
 import { useExplore } from '@/lib/store/ExploreProvider';
 import { useShopping } from '@/lib/store/ShoppingProvider';
 import { recipeForRun, runState } from '@/lib/explore/liveRecipe';
+import { fitFor } from '@/lib/explore/fit';
 import { COURSE_LABEL } from '@/lib/db/types';
 import { RecipeImage } from '@/components/explore/RecipeImage';
 import { NutritionCard } from '@/components/recipe/NutritionCard';
@@ -40,10 +41,17 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
    * puts the original back on screen at any point.
    */
   const run = useMemo(() => runState(session.excluded, session.boosted), [session.excluded, session.boosted]);
-  const adjusted = useMemo(
-    () => (stored ? recipeForRun(stored, run, ingredientIndex) : null),
-    [stored, run, ingredientIndex],
-  );
+  /**
+   * Opened from the Explore plate, the recipe is the one that plate described —
+   * including any swap or left-out optional that made it fit the filters. Opened
+   * from anywhere else, the filters are not what you came for, so no plan.
+   */
+  const fromExplore = session.current === id;
+  const adjusted = useMemo(() => {
+    if (!stored) return null;
+    const plan = fromExplore ? fitFor(stored, run, session.filters, ingredientIndex)?.plan : undefined;
+    return recipeForRun(stored, run, ingredientIndex, plan);
+  }, [stored, run, ingredientIndex, fromExplore, session.filters]);
   const isAdjusted = !!stored && adjusted !== stored;
   const recipe = asWritten ? stored : adjusted;
 

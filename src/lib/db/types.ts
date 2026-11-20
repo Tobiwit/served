@@ -15,6 +15,10 @@ export type IngredientCategory =
   | 'legume'
   | 'whole_grain'
   | 'refined_grain'
+  /** bought assembled: filled pasta, dumplings, veggie burgers, meat alternatives */
+  | 'ready_made'
+  /** tofu, tempeh, seitan — protein foods that are not produce and not meat */
+  | 'plant_protein'
   | 'protein_lean'
   | 'protein_fatty'
   | 'processed_meat'
@@ -23,6 +27,8 @@ export type IngredientCategory =
   | 'dairy_low_fat'
   | 'dairy_full_fat'
   | 'cheese'
+  /** whey and other protein powders, protein bars */
+  | 'protein_supplement'
   | 'nuts_seeds'
   | 'oil'
   | 'fat_solid'
@@ -38,6 +44,8 @@ export const INGREDIENT_CATEGORIES: IngredientCategory[] = [
   'legume',
   'whole_grain',
   'refined_grain',
+  'ready_made',
+  'plant_protein',
   'protein_lean',
   'protein_fatty',
   'processed_meat',
@@ -46,6 +54,7 @@ export const INGREDIENT_CATEGORIES: IngredientCategory[] = [
   'dairy_low_fat',
   'dairy_full_fat',
   'cheese',
+  'protein_supplement',
   'nuts_seeds',
   'oil',
   'fat_solid',
@@ -62,6 +71,8 @@ export const CATEGORY_LABEL: Record<IngredientCategory, string> = {
   legume: 'Legume',
   whole_grain: 'Whole grain',
   refined_grain: 'Refined grain',
+  ready_made: 'Ready-made',
+  plant_protein: 'Plant protein',
   protein_lean: 'Lean protein',
   protein_fatty: 'Fatty protein',
   processed_meat: 'Processed meat',
@@ -70,6 +81,7 @@ export const CATEGORY_LABEL: Record<IngredientCategory, string> = {
   dairy_low_fat: 'Low-fat dairy',
   dairy_full_fat: 'Full-fat dairy',
   cheese: 'Cheese',
+  protein_supplement: 'Protein supplement',
   nuts_seeds: 'Nuts & seeds',
   oil: 'Oil',
   fat_solid: 'Solid fat',
