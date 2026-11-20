@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useData } from '@/lib/store/DataProvider';
 import { parseRecipeText } from '@/lib/parse/recipeText';
@@ -8,6 +8,7 @@ import { draftFromParsed, draftIngredient, emptyDraft, toNewRecipe, withSwapRows
 import { RecipeEditor } from '@/components/add/RecipeEditor';
 import { Backlog, FromBacklogNote } from '@/components/add/Backlog';
 import { DictateIngredients, type DictatedLine } from '@/components/add/DictateIngredients';
+import { draftFromSeed, takeRecipeSeed } from '@/lib/add/handoff';
 import type { BacklogEntry } from '@/lib/db/types';
 
 const SAMPLE = `Miso Butter Mushroom Toast
@@ -30,7 +31,7 @@ Method
 
 export default function AddPage() {
   const router = useRouter();
-  const { ingredients, ingredientIndex, saveRecipe, deleteBacklog } = useData();
+  const { ready, ingredients, ingredientIndex, saveRecipe, deleteBacklog } = useData();
 
   const [text, setText] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -54,6 +55,16 @@ export default function AddPage() {
     setFrom(source);
     setDraft(next);
   };
+
+  // A meal handed over from the tracker opens straight in the editor, titled and
+  // with its lines in. Waits for the collection so its ingredients can be matched.
+  useEffect(() => {
+    if (!ready) return;
+    const seed = takeRecipeSeed();
+    if (seed) startDraft(draftFromSeed(seed, ingredients, ingredientIndex));
+    // once per visit — the seed is taken, so a later change has nothing to pick up
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
 
   const leaveDraft = () => {
     setFrom(null);

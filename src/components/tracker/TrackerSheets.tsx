@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { FoodLogEntry, FoodLogItem, Ingredient, MealSlot, Recipe } from '@/lib/db/types';
 import { MEAL_SLOT_LABEL } from '@/lib/db/types';
 import { useData } from '@/lib/store/DataProvider';
@@ -13,6 +14,7 @@ import { formatAmount } from '@/lib/nutrition/units';
 import { ACTIVITY_COLOR, SLOT_COLOR, type Goals } from '@/lib/tracker/model';
 import { findIngredient, gramsFor, parseUtterance, type SpokenItem } from '@/lib/tracker/spoken';
 import { itemOf, openChoices, plateItems, plateOf, sumItems, type PlateChoices } from '@/lib/tracker/recipeLog';
+import { handOffRecipe, isStandIn } from '@/lib/add/handoff';
 
 /* ======================================================================= recipe */
 
@@ -364,6 +366,7 @@ function rowsOf(entry: FoodLogEntry): Row[] {
  * touched. The whole entry can also come off the day.
  */
 export function EntrySheet({ entry, onClose }: { entry: FoodLogEntry | null; onClose: () => void }) {
+  const router = useRouter();
   const { deleteFoodLog, saveFoodLog, ingredients, ingredientIndex, saveIngredient } = useData();
   const [confirming, setConfirming] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
@@ -605,38 +608,110 @@ export function EntrySheet({ entry, onClose }: { entry: FoodLogEntry | null; onC
             </div>
           )}
 
-          {!dirty &&
-            (confirming ? (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(false)}
-                  className="surface hairline"
-                  style={{ flex: 1, padding: '13px 18px', borderRadius: 'var(--r-pill)', fontSize: 14, color: 'var(--ink-45)' }}
-                >
-                  Keep it
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await deleteFoodLog(entry.id);
-                    onClose();
-                  }}
-                  style={{ flex: 1, padding: '13px 18px', borderRadius: 'var(--r-pill)', fontSize: 14, background: 'var(--coral)', color: '#fff' }}
-                >
-                  Remove from the day
-                </button>
+          {/* The last row: taking the meal off the day on the left third, in red,
+              and starting a recipe from it across the rest — the lines as they
+              stand here, edits and all, with the meal's name as the title. */}
+          {(() => {
+            const canRemove = !dirty;
+            const canRecipe = !activity && !unknown && rows.some((r) => !isStandIn(r.item));
+            if (confirming && canRemove) {
+              return (
+                // the confirm lands away from where Remove was, so a double tap
+                // on Remove can never take the meal off by accident
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(false)}
+                    className="surface hairline"
+                    style={{ height: 52, borderRadius: 'var(--r-pill)', fontSize: 14, color: 'var(--ink-45)' }}
+                  >
+                    Keep it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await deleteFoodLog(entry.id);
+                      onClose();
+                    }}
+                    style={{ height: 52, borderRadius: 'var(--r-pill)', fontSize: 14, background: 'var(--coral)', color: '#fff', whiteSpace: 'nowrap' }}
+                  >
+                    Remove from the day
+                  </button>
+                </div>
+              );
+            }
+            if (!canRemove && !canRecipe) return null;
+            const count = rows.filter((r) => !isStandIn(r.item)).length;
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: canRemove && canRecipe ? '1fr 2fr' : '1fr', gap: 8 }}>
+                {canRemove && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(true)}
+                    style={{
+                      height: 52,
+                      borderRadius: 'var(--r-pill)',
+                      background: 'rgba(255,131,96,0.14)',
+                      color: '#c4472f',
+                      fontSize: 14,
+                      fontWeight: 400,
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+                {canRecipe && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handOffRecipe({ title: entry.label, items: rows.map((r) => r.item) });
+                      onClose();
+                      router.push('/add');
+                    }}
+                    aria-label="Make a recipe from this"
+                    className="surface hairline"
+                    style={{
+                      height: 52,
+                      minWidth: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '0 8px 0 16px',
+                      borderRadius: 'var(--r-pill)',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Make a recipe</span>
+                      <span
+                        className="t-micro t-dim-2"
+                        style={{ display: 'block', fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      >
+                        {count} ingredient{count === 1 ? '' : 's'} · “{entry.label}”
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden
+                      style={{
+                        flex: '0 0 auto',
+                        width: 36,
+                        height: 36,
+                        borderRadius: '50%',
+                        background: 'var(--ink)',
+                        color: '#fff',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M3 8h9.5M8.5 4l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  </button>
+                )}
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirming(true)}
-                className="t-micro"
-                style={{ justifySelf: 'start', color: '#c4472f', padding: '6px 0' }}
-              >
-                Remove…
-              </button>
-            ))}
+            );
+          })()}
         </div>
       )}
     </Sheet>
